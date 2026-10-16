@@ -16,6 +16,19 @@ with patch.dict("sys.modules", {name: MagicMock() for name in ("numpy", "pandas"
     spec.loader.exec_module(job)
 
 NOW = datetime(2026, 10, 17, 6, 30, tzinfo=timezone.utc)
+FLAG = "NIRMOL_ATOMIC_PUBLISHER_ENABLED"
+DISABLED_FLAGS = (None, "false", "0", "", "unexpected", "TRUE", "True", " true", "true ", "1", "yes")
+
+# Even an accidentally unstubbed transport must never open a socket in this suite.
+NETWORK_BLOCKERS = [patch(target, side_effect=AssertionError("Offline publisher tests forbid network access"))
+                    for target in ("socket.create_connection", "socket.socket.connect", "socket.socket.connect_ex")]
+
+def setUpModule():
+    for blocker in NETWORK_BLOCKERS: blocker.start()
+
+def tearDownModule():
+    for blocker in reversed(NETWORK_BLOCKERS): blocker.stop()
+
 def iso(value):
     return value.isoformat().replace("+00:00", "Z")
 
@@ -62,7 +75,7 @@ class Transport:
 
 class PublicationTests(unittest.TestCase):
     def setUp(self):
-        self.env = patch.dict("os.environ", {"NEXT_PUBLIC_SUPABASE_URL": "https://controlled.invalid", "SUPABASE_SERVICE_ROLE_KEY": "private-controlled-key"})
+        self.env = patch.dict("os.environ", {"NEXT_PUBLIC_SUPABASE_URL": "https://controlled.invalid", "SUPABASE_SERVICE_ROLE_KEY": "private-controlled-key", FLAG: "true"})
         self.env.start()
         self.addCleanup(self.env.stop)
 
@@ -227,6 +240,75 @@ class PublicationTests(unittest.TestCase):
         transport.post = mutate
         self.assertEqual(job.save(data, transport=transport, now=NOW), 7)
         self.assertEqual(transport.posts[0][1]["data"], transport.posts[1][1]["data"])
+
+class SafetyLockTests(unittest.TestCase):
+    def test_direct_save_rejects_every_non_opt_in_before_validation_or_transport(self):
+        for value in DISABLED_FLAGS:
+            env = {"NEXT_PUBLIC_SUPABASE_URL": "https://controlled.invalid", "SUPABASE_SERVICE_ROLE_KEY": "private-controlled-key"}
+            if value is not None: env[FLAG] = value
+            transport = Transport()
+            with self.subTest(flag=value), patch.dict("os.environ", env, clear=True), \
+                    patch.object(job, "validate_publication") as validate, patch("builtins.print"):
+                with self.assertRaisesRegex(RuntimeError, "disabled"):
+                    job.save(payload(), transport=transport, now=NOW)
+                validate.assert_not_called()
+                self.assertEqual(transport.posts + transport.deletes, [])
+
+    def test_main_rejects_every_non_opt_in_before_forecast_work(self):
+        for value in DISABLED_FLAGS:
+            env = {} if value is None else {FLAG: value}
+            frame = SimpleNamespace(index=MagicMock(), itertuples=lambda: iter(()))
+            with self.subTest(flag=value), patch.dict("os.environ", env, clear=True), \
+                    patch.dict("sys.modules", {"pandas": MagicMock()}), patch("sys.argv", ["refresh_forecast.py"]), \
+                    patch.object(job, "build_forecast", return_value=(frame, {}, iso(NOW))) as build, \
+                    patch.object(job, "publication_payload", return_value=payload()), \
+                    patch.object(job, "save") as save, patch("builtins.print"):
+                with self.assertRaisesRegex(RuntimeError, "disabled"):
+                    job.main()
+                build.assert_not_called()
+                save.assert_not_called()
+
+    def test_enabled_main_keeps_the_existing_forecast_and_publication_path(self):
+        frame, meta = SimpleNamespace(index=MagicMock(), itertuples=lambda: iter(())), {"controlled": True}
+        data = payload()
+        with patch.dict("os.environ", {FLAG: "true"}, clear=True), \
+                patch.dict("sys.modules", {"pandas": MagicMock()}), patch("sys.argv", ["refresh_forecast.py"]), \
+                patch.object(job, "build_forecast", return_value=(frame, meta, iso(NOW))) as build, \
+                patch.object(job, "publication_payload", return_value=data) as convert, \
+                patch.object(job, "save") as save, patch("builtins.print"):
+            job.main()
+            build.assert_called_once_with()
+            convert.assert_called_once_with(frame, meta, iso(NOW))
+            save.assert_called_once_with(data)
+
+    def test_dry_run_still_builds_and_validates_without_opt_in_or_publication(self):
+        frame = SimpleNamespace(index=MagicMock(), itertuples=lambda: iter(()))
+        with patch.dict("os.environ", {}, clear=True), patch.dict("sys.modules", {"pandas": MagicMock()}), \
+                patch("sys.argv", ["refresh_forecast.py", "--dry-run"]), \
+                patch.object(job, "build_forecast", return_value=(frame, {}, iso(NOW))) as build, \
+                patch.object(job, "publication_payload", return_value=payload()) as convert, \
+                patch.object(job, "save") as save, patch("builtins.print"):
+            job.main()
+            build.assert_called_once_with()
+            convert.assert_called_once_with(frame, {}, iso(NOW))
+            save.assert_not_called()
+
+    def test_enabled_publication_failure_propagates_without_an_alternate_path(self):
+        frame = SimpleNamespace(index=MagicMock(), itertuples=lambda: iter(()))
+        with patch.dict("os.environ", {FLAG: "true"}, clear=True), patch.dict("sys.modules", {"pandas": MagicMock()}), \
+                patch("sys.argv", ["refresh_forecast.py"]), \
+                patch.object(job, "build_forecast", return_value=(frame, {}, iso(NOW))), \
+                patch.object(job, "publication_payload", return_value=payload()), \
+                patch.object(job, "save", side_effect=RuntimeError("publication unconfirmed")) as save, patch("builtins.print"):
+            with self.assertRaisesRegex(RuntimeError, "publication unconfirmed"):
+                job.main()
+            save.assert_called_once()
+
+    def test_workflow_requires_opt_in_and_forwards_its_actual_value(self):
+        workflow = (Path(__file__).parents[2] / ".github/workflows/forecast.yml").read_text(encoding="utf-8")
+        self.assertIn("if: ${{ vars.NIRMOL_ATOMIC_PUBLISHER_ENABLED == 'true' }}", workflow)
+        publish_step = workflow.split("- run: python jobs/refresh_forecast.py", 1)[1]
+        self.assertRegex(publish_step, r"(?m)^\s+NIRMOL_ATOMIC_PUBLISHER_ENABLED: \$\{\{ vars\.NIRMOL_ATOMIC_PUBLISHER_ENABLED \}\}$")
 
 class SqlSourceTests(unittest.TestCase):
     def test_jsonb_subtraction_cannot_bind_to_the_extraction_key(self):

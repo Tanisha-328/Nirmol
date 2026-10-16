@@ -28,5 +28,7 @@ jobs:
       - run: pip install -r jobs/requirements.txt
       - run: python jobs/refresh_forecast.py
         env:
+          # Forward the operator's actual value; never hardcode an enabling default.
+          NIRMOL_ATOMIC_PUBLISHER_ENABLED: ${{ vars.NIRMOL_ATOMIC_PUBLISHER_ENABLED }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

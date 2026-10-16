@@ -6,7 +6,7 @@ behind each hour (SHAP), and writes one forecast_runs row + 25 forecast_points.
 
 Usage:
     py jobs/refresh_forecast.py --dry-run      # print only, no database
-    py jobs/refresh_forecast.py                # needs NEXT_PUBLIC_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY
+    py jobs/refresh_forecast.py                # disabled unless explicitly opted in after database verification
 """
 
 from __future__ import annotations
@@ -29,6 +29,7 @@ MODEL = "nirmol-xgb-v1"
 LAT, LON = 23.796374, 90.424614  # US Embassy site the model was trained on
 HOURS = 25
 KEEP_DAYS = 3
+ATOMIC_PUBLISHER_FLAG = "NIRMOL_ATOMIC_PUBLISHER_ENABLED"
 
 CAMS_VARS = ["pm2_5", "pm10", "carbon_monoxide", "dust"]
 WEATHER_VARS = [
@@ -198,7 +199,14 @@ def publication_payload(forecast: pd.DataFrame, meta: dict, issued_at: str, *, n
     return json.loads(json.dumps(payload, allow_nan=False))
 
 
+def require_atomic_publisher_enabled() -> None:
+    # Deliberately exact: absent, false, 0, case variants and whitespace fail closed.
+    if os.environ.get(ATOMIC_PUBLISHER_FLAG) != "true":
+        raise RuntimeError("Experimental atomic forecast publication is disabled; database verification and explicit opt-in are required.")
+
+
 def save(payload: dict, *, transport=None, now: datetime | None = None) -> int:
+    require_atomic_publisher_enabled()
     validate_publication(payload, now)
     frozen = json.dumps({"payload": payload}, allow_nan=False, separators=(",", ":"))
     payload = json.loads(frozen)["payload"]
@@ -248,10 +256,13 @@ def save(payload: dict, *, transport=None, now: datetime | None = None) -> int:
 
 
 def main() -> None:
-    import pandas as pd
     parser = argparse.ArgumentParser()
     parser.add_argument("--dry-run", action="store_true", help="print the forecast without saving")
     args = parser.parse_args()
+
+    if not args.dry_run:
+        require_atomic_publisher_enabled()
+    import pandas as pd
 
     forecast, meta, issued_at = build_forecast()
     payload = publication_payload(forecast, meta, issued_at)
