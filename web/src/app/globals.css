@@ -34,3 +34,26 @@ body {
   color: var(--foreground);
   font-family: var(--font-inter), var(--font-bengali), system-ui, sans-serif;
 }
+
+/* Dashboard-only contrast and focus fixes; other feature palettes stay intact. */
+.dashboard {
+  --accent: #0b686b;
+}
+
+@media (prefers-color-scheme: dark) {
+  .dashboard { --accent: #5ed6d2; }
+}
+
+.dashboard .dashboard-primary {
+  color: #ffffff;
+  background: #0b686b;
+}
+
+.dashboard :is(button, select, a):focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard .animate-pulse { animation: none; }
+}

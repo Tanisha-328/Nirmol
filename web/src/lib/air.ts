@@ -2,13 +2,18 @@
 // label it Measured / Model estimate / Demo. Missing values are null, never 0.
 
 import { inDhakaModelArea } from "./places";
+import type { ForecastExplanation } from "./forecast-explanation";
 import { absoluteTime, forecastWindow, hasForecastInterval, isCompleteForecast, isFreshModelIssue,
   object, openMeteoTime, readCurrent, readForecast, readNirmolPublication, readWeather } from "./air-validation";
 
 export type DataKind = "measured" | "model_estimate" | "demo";
 export type ForecastSource = "nirmol" | "cams";
 
-export type ForecastPoint = { time: string; pm25: number | null; low?: number | null; high?: number | null };
+export type ForecastPoint = {
+  time: string; pm25: number | null; low?: number | null; high?: number | null;
+  /** Optional genuine, hour-owned median-model SHAP metadata; absent for CAMS/legacy. */
+  explanation?: ForecastExplanation;
+};
 
 export type AirReport = {
   lat: number;

@@ -2,6 +2,8 @@
 // AirReport only as a type: no provider URLs, credentials or fetching run here.
 import type { AirReport, ForecastPoint } from "./air";
 import { isUsableCurrentEstimate, isValidConcentration } from "./exposure";
+import { readForecastFactors, type ForecastExplanation } from "./forecast-explanation";
+import { inDhakaModelArea } from "./places";
 
 export function object(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === "object" && !Array.isArray(value)
@@ -117,8 +119,15 @@ export function readNirmolPublication(value: unknown, nowMs: number, legacyBefor
               typeof factor.effect !== "number" || !Number.isFinite(factor.effect);
           })) throw new Error("Invalid forecast interval or SHAP metadata");
     } else if ((p.pm25_low != null || p.pm25_high != null) && !range) throw new Error("Invalid legacy interval");
+    // A06's publication-integrity checks above remain unchanged. Explanation
+    // eligibility is stricter: only this reviewed model's recognized inputs are
+    // labelled. Unknown inputs omit SHAP without altering its PM prediction.
+    const factors = manifest ? readForecastFactors(object(p.top_factors)?.factors) : null;
     return { time: p.valid_at as string, pm25: p.pm25_ugm3,
-      ...(range ? { low: p.pm25_low as number, high: p.pm25_high as number } : {}) };
+      ...(range ? { low: p.pm25_low as number, high: p.pm25_high as number } : {}),
+      ...(factors ? { explanation: { runId: run.id as number, model: "nirmol-xgb-v1", validAt: p.valid_at as string,
+        issuedAt: run.issued_at as string, scale: "log1p_pm25", factors } as ForecastExplanation } : {}),
+    };
   });
   return { points, issuedAt: run.issued_at, publication: manifest ? "manifest" : "legacy" };
 }
@@ -142,7 +151,31 @@ export function readCurrent(value: unknown, nowMs: number): AirReport["now"] {
   };
 }
 
-export function readForecast(value: unknown): ForecastPoint[] {
+type ExplanationContext = { issuedAt: string; nowMs: number };
+
+// Date.parse retains milliseconds only. Preserve the remaining ISO precision
+// while treating absent fractions, trailing zeroes and zone-equivalent instants equally.
+function timestampFraction(value: string): string {
+  return /\.(\d+)(?:Z|[+-]\d{2}:\d{2})$/.exec(value)?.[1].replace(/0+$/, "") ?? "";
+}
+
+function readPointExplanation(value: unknown, timeMs: number, context?: ExplanationContext): ForecastExplanation | null {
+  const data = object(value);
+  if (!context || !isFreshModelIssue(context.issuedAt, context.nowMs) || !data ||
+      !Number.isSafeInteger(data.runId) || (data.runId as number) <= 0 ||
+      data.model !== "nirmol-xgb-v1" || data.scale !== "log1p_pm25" ||
+      typeof data.validAt !== "string" || absoluteTime(data.validAt) !== timeMs ||
+      // Date.parse truncates submilliseconds; an exact forecast hour cannot
+      // contain any nonzero fractional seconds, even below that precision.
+      /\.\d*[1-9]\d*(?:Z|[+-]\d{2}:\d{2})$/.test(data.validAt) ||
+      typeof data.issuedAt !== "string" || absoluteTime(data.issuedAt) !== absoluteTime(context.issuedAt) ||
+      timestampFraction(data.issuedAt) !== timestampFraction(context.issuedAt)) return null;
+  const factors = readForecastFactors(data.factors);
+  return factors ? { runId: data.runId as number, model: "nirmol-xgb-v1", validAt: data.validAt,
+    issuedAt: data.issuedAt, scale: "log1p_pm25", factors } : null;
+}
+
+export function readForecast(value: unknown, explanationContext?: ExplanationContext): ForecastPoint[] {
   if (!Array.isArray(value)) throw new Error("Invalid forecast array");
   const result: ForecastPoint[] = [];
   let previous = -Infinity;
@@ -157,18 +190,30 @@ export function readForecast(value: unknown): ForecastPoint[] {
     const low = concentration(point.low);
     const high = concentration(point.high);
     const rangeValid = pm25 !== null && low !== null && high !== null && low <= pm25 && pm25 <= high;
+    // Keep existing PM normalization, but only exact parent hours own SHAP.
+    const explanation = pm25 !== null && timestampFraction(point.time as string) === ""
+      ? readPointExplanation(point.explanation, ms, explanationContext) : null;
     result.push({ time: point.time as string, pm25,
       ...(point.low !== undefined || point.high !== undefined
         ? { low: rangeValid ? low : null, high: rangeValid ? high : null } : {}),
+      ...(explanation ? { explanation } : {}),
+    });
+  }
+  if (new Set(result.flatMap((point) => point.explanation ? [point.explanation.runId] : [])).size > 1) {
+    // One response represents one selected publication, never stitched runs.
+    return result.map((point) => {
+      delete point.explanation;
+      return point;
     });
   }
   return result;
 }
 
-export function readWeather(value: unknown): AirReport["weather"] {
+export function readWeather(value: unknown, nowMs: number = Date.now()): AirReport["weather"] {
   const weather = object(value);
   if (!weather) throw new Error("Invalid weather object");
-  const time = typeof weather.time === "string" && Number.isFinite(absoluteTime(weather.time)) ? weather.time : "";
+  const time = typeof weather.time === "string" && Number.isFinite(absoluteTime(weather.time)) &&
+    isUsableCurrentEstimate(weather.time, nowMs) ? weather.time : "";
   const finite = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
   return {
     temperature: time && finite(weather.temperature) ? weather.temperature : null,
@@ -193,7 +238,9 @@ export function readAirReport(value: unknown, location: { lat: number; lon: numb
   }
   return {
     lat: data.lat, lon: data.lon, now: readCurrent(data.now, nowMs),
-    weather: readWeather(data.weather), forecast: readForecast(data.forecast),
+    weather: readWeather(data.weather, nowMs), forecast: readForecast(data.forecast,
+      data.forecastSource === "nirmol" && data.inDhakaModelArea && inDhakaModelArea(data.lat, data.lon) &&
+      typeof data.forecastIssuedAt === "string" ? { issuedAt: data.forecastIssuedAt, nowMs } : undefined),
     forecastSource: data.forecastSource, inDhakaModelArea: data.inDhakaModelArea, fetchedAt: data.fetchedAt,
     ...(typeof data.forecastIssuedAt === "string" ? { forecastIssuedAt: data.forecastIssuedAt } : {}),
   };

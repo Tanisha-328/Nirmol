@@ -30,9 +30,9 @@ been medically validated.
 Run the provider validation/current-selection tests with the existing regressions:
 
 ```powershell
-node --test tests/air.test.mjs tests/exposure.test.mjs tests/travel.test.mjs tests/simulator.test.mjs tests/exposure-diary.test.mjs
+node --test tests/air.test.mjs tests/dashboard.test.mjs tests/exposure.test.mjs tests/travel.test.mjs tests/simulator.test.mjs tests/exposure-diary.test.mjs
 npx.cmd tsc --noEmit
-npm.cmd run lint
+npm.cmd run lint -- --max-warnings=0
 npm.cmd run build
 npm.cmd run start -- --hostname 127.0.0.1 --port 3001
 # In another terminal, using the freshly built application:
@@ -57,6 +57,35 @@ for a reading time. Weather without a valid timestamp likewise has null values
 and an empty `weather.time`. Existing field names/types and forecast valid times
 are preserved. These fixtures are separate from live-provider, database and
 deployed integration checks.
+
+## F01/F07: saved locations, indicative AQI and genuine SHAP
+
+`dashboard.test.mjs` validates the saved `nirmol.loc` selection without changing
+any browser storage. Invalid or unreadable selections use the existing Dhaka
+default. Registered IDs require their registry coordinates; explicit null IDs
+retain custom Bangladesh coordinates. Browser checks cover blocked storage,
+reloads, unrelated-key preservation and restored-location request ownership.
+
+Forecast points can optionally include `explanation` with `runId`, `model`,
+`validAt`, `issuedAt`, `scale: "log1p_pm25"` and three `{feature,value,effect}`
+factors. Only validated manifest publications of `nirmol-xgb-v1` supply this
+metadata. The 24 reviewed identifiers are checked against model metadata.
+Unknown, nonfinite, duplicate, incomplete, wrong-hour/model/issuance or mixed-run
+explanations are omitted. CAMS and legacy points remain explanation-unavailable.
+PM2.5 values and source/issuance selection retain their existing behavior.
+
+Dashboard browser checks select hours by absolute timestamp, including the next
+Dhaka date, and exercise sign/order, expiry, source/location changes, keyboard
+controls, six category badge contrasts and 320px/desktop English/Bangla layouts
+in both themes. Native SHAP computation and deployed Supabase retrieval are not
+executed: these are controlled stored-JSON/API fixtures, not live integration.
+
+The AQI breakpoint calculation is unchanged and is labelled an indicative
+PM2.5-based estimate, with a regulatory/NowCast averaging disclaimer. SHAP is
+labelled as log-scale model attribution, not pollution causation or uncertainty.
+Links open the existing personalization tools, which refresh their own data;
+users confirm location/source there. No reporting route exists in this checkout;
+connecting Member 02's reporting UI remains a separate integration dependency.
 
 # Reliability batch: coverage, issuance and deadlines
 

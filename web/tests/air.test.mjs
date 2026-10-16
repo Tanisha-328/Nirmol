@@ -29,6 +29,7 @@ const { getAirReport } = await import(await moduleURL(new URL("../src/lib/air.ts
 const { pm25ToAqi } = await import(await moduleURL(new URL("../src/lib/aqi.ts", import.meta.url)));
 const { absoluteTime, readAirReport } = await import(await moduleURL(new URL("../src/lib/air-validation.ts", import.meta.url)));
 const publicationModule = await import(await moduleURL(new URL("../src/lib/air-validation.ts", import.meta.url)));
+const { FORECAST_FEATURE_LABELS } = await import(await moduleURL(new URL("../src/lib/forecast-explanation.ts", import.meta.url)));
 const { GET } = await import(await moduleURL(new URL("../src/app/api/air/route.ts", import.meta.url)));
 const { readTravelAir, planTravel } = await import(await moduleURL(new URL("../src/lib/travel.ts", import.meta.url)));
 const { readSimulatorCurrent, compareCurrent } = await import(await moduleURL(new URL("../src/lib/simulator.ts", import.meta.url)));
@@ -187,6 +188,33 @@ test("A02 weather uses strict numeric values and cannot carry readings without a
   result = await report();
   assert.deepEqual(result.weather, { temperature: null, humidity: null, windSpeed: null, time: "" });
 });
+test("A08 weather freshness rejects stale or future timestamps while retaining usable air and real zero", async () => {
+  for (const timeMs of [nowMs - 4 * HOUR, nowMs + 60_000]) {
+    weather.current.time = minute(timeMs);
+    const result = await report();
+    assert.deepEqual(result.weather, { temperature: null, humidity: null, windSpeed: null, time: "" });
+    assert.equal(result.now.pm25, 20);
+    assert.equal(result.forecast[0].pm25, 25);
+  }
+  weather.current.temperature_2m = 0;
+  weather.current.relative_humidity_2m = 0;
+  weather.current.wind_speed_10m = 0;
+  for (const timeMs of [nowMs, nowMs - 3 * HOUR]) {
+    weather.current.time = minute(timeMs);
+    const result = await report();
+    assert.deepEqual(result.weather, { temperature: 0, humidity: 0, windSpeed: 0, time: minute(timeMs) + ":00Z" });
+    assert.equal(result.now.pm25, 20);
+  }
+});
+
+test("dashboard weather validation uses the supplied clock to expire a previously fresh reading", async () => {
+  const result = await report();
+  const later = nowMs + 4 * HOUR;
+  const revalidated = readAirReport({ ...result, fetchedAt: iso(later), now: { ...result.now, time: iso(later) } }, OTHER, later);
+  assert.deepEqual(revalidated.weather, { temperature: null, humidity: null, windSpeed: null, time: "" });
+  assert.equal(revalidated.now.pm25, 20);
+});
+
 test("A02 Nirmol offsets are preserved and invalid publication values reject the entire run", async () => {
   custom();
   points[0].valid_at = "2026-10-17T00:00:00+06:00";
@@ -199,7 +227,8 @@ test("A02 Nirmol offsets are preserved and invalid publication values reject the
     const fallback = await report(LOCATION);
     assert.equal(fallback.forecastSource, "cams"); assert.equal(fallback.now.source, "cams");
   }
-  assert.deepEqual(result.forecast[0], { time: "2026-10-17T00:00:00+06:00", pm25: 40, low: 30, high: 50 });
+  const { time, pm25, low, high } = result.forecast[0];
+  assert.deepEqual({ time, pm25, low, high }, { time: "2026-10-17T00:00:00+06:00", pm25: 40, low: 30, high: 50 });
 });
 test("A02 invalid Nirmol timestamps, hour24 and timestamps without zones are not used", async () => {
   for (const time of ["2026-10-16T18:00:00", "2026-02-30T18:00:00Z", "2026-10-16T24:00:00Z", "2026-10-16T24:00:00+06:00", "bad", null]) {
@@ -672,4 +701,180 @@ test("A06 future or malformed legacy cutoffs cannot authorize legacy publication
     process.env.NIRMOL_LEGACY_FORECAST_BEFORE = cutoff; publications([legacy]);
     assert.equal((await report(LOCATION)).forecastSource, "cams");
   }
+});
+
+// A09 controlled stored-JSON fixtures: no live provider, model or database call.
+function explanation(run, index = 0) {
+  return {
+    runId: run.id, model: run.model, validAt: run.forecast_points[index].valid_at,
+    issuedAt: run.issued_at, scale: "log1p_pm25",
+    factors: structuredClone(run.forecast_points[index].top_factors.factors),
+  };
+}
+
+test("A09 genuine stored SHAP survives the API with hour, model, issuance, sign and order", async () => {
+  const run = publication(); publications([JSON.parse(JSON.stringify(run))]);
+  const result = await report(LOCATION);
+  assert.equal(result.forecastSource, "nirmol");
+  assert.deepEqual(result.forecast[4].explanation, explanation(run, 4));
+  assert.deepEqual(readAirReport(result, LOCATION, nowMs).forecast[4].explanation, explanation(run, 4));
+  assert.equal(result.forecast[4].pm25, run.forecast_points[4].pm25_ugm3);
+  assert.equal(result.forecastIssuedAt, run.issued_at);
+});
+
+test("A09 recovered publication never borrows factors from a different run or hour", async () => {
+  const newer = publication(2); newer.forecast_points = [];
+  const run = publication(1, { issued_at: iso(nowMs - 120_000) }); publications([newer, run]);
+  const result = await report(LOCATION);
+  for (const index of [0, 1, 24]) assert.deepEqual(result.forecast[index].explanation, explanation(run, index));
+});
+
+test("A09 all and only the 24 trained feature IDs can be explained", async () => {
+  const meta = JSON.parse(await readFile(new URL("../../ml/artifacts/nirmol_xgb_v1_meta.json", import.meta.url), "utf8"));
+  assert.equal(meta.features.length, 24);
+  assert.deepEqual(Object.keys(FORECAST_FEATURE_LABELS), meta.features, "reviewed schema must match the trained feature order");
+  assert.ok(Object.values(FORECAST_FEATURE_LABELS).every((labels) => labels.en && labels.bn));
+  for (const feature of meta.features) {
+    const run = publication();
+    run.forecast_points[0].top_factors.factors = [feature, ...meta.features.filter((id) => id !== feature).slice(0, 2)]
+      .map((id, i) => ({ feature: id, value: 0, effect: i === 1 ? -0.125 : 0 }));
+    publications([run]);
+    assert.deepEqual((await report(LOCATION)).forecast[0].explanation, explanation(run));
+  }
+  const run = publication(); run.forecast_points[0].top_factors.factors[0].feature = "vehicle_emissions";
+  publications([run]); const result = await report(LOCATION);
+  assert.equal(result.forecastSource, "nirmol"); assert.equal(result.forecast[0].pm25, 10);
+  assert.equal(result.forecast[0].explanation, undefined);
+  assert.deepEqual(result.forecast[1].explanation, explanation(run, 1));
+});
+
+test("A09 legacy publications and CAMS forecasts never receive SHAP explanations", async () => {
+  assert.ok((await report()).forecast.every((p) => p.explanation === undefined));
+  const legacy = publication(); delete legacy.forecast_start; delete legacy.published_at;
+  process.env.NIRMOL_LEGACY_FORECAST_BEFORE = iso(nowMs); publications([legacy]);
+  const result = await report(LOCATION);
+  assert.equal(result.forecastSource, "nirmol");
+  assert.ok(result.forecast.every((p) => p.explanation === undefined));
+});
+
+test("A09 client validates supported factors without coercion and omits corrupt optional metadata", async () => {
+  const run = publication(); publications([run]); const raw = await report(LOCATION);
+  for (const corrupt of [
+    (e) => { e.factors = []; }, (e) => { e.factors.pop(); },
+    (e) => { e.factors.push({ feature: "weekend", value: 1, effect: 0 }); },
+    (e) => { e.factors[0].feature = "unrecognized_feature"; },
+    (e) => { e.factors[0] = { ...e.factors[1] }; },
+    (e) => { delete e.factors[0].value; }, (e) => { e.factors[0].value = "4"; },
+    (e) => { e.factors[0].value = Infinity; }, (e) => { e.factors[0].effect = NaN; },
+    (e) => { e.factors[0].effect = "0.3"; }, (e) => { e.factors[0] = null; },
+  ]) {
+    const value = explanation(run); corrupt(value);
+    const forecast = raw.forecast.map((p, i) => i === 0 ? { ...p, explanation: value } : p);
+    const result = readAirReport({ ...raw, forecast }, LOCATION, nowMs);
+    assert.equal(result.forecast[0].explanation, undefined);
+    assert.equal(result.forecast[0].pm25, raw.forecast[0].pm25);
+  }
+});
+
+test("A09 wrong model, run, scale, hour or issuance cannot masquerade as a point explanation", async () => {
+  const run = publication(); publications([run]); const raw = await report(LOCATION);
+  for (const overrides of [
+    { runId: 0 }, { runId: -1 }, { runId: "1" }, { runId: Number.MAX_SAFE_INTEGER + 1 },
+    { model: "nirmol-unreviewed-v99" }, { scale: "ug_m3" },
+    { validAt: run.forecast_points[1].valid_at }, { validAt: "2026-10-16T18:00:00" },
+    { validAt: "2026-02-30T18:00:00Z" }, { validAt: "2026-10-16T24:00:00Z" },
+    { issuedAt: iso(nowMs - HOUR) }, { issuedAt: "2026-10-16T18:29:00" },
+  ]) {
+    const forecast = [{ ...raw.forecast[0], explanation: { ...explanation(run), ...overrides } }];
+    assert.equal(readAirReport({ ...raw, forecast }, LOCATION, nowMs).forecast[0].explanation, undefined);
+  }
+});
+
+test("A09 client retains signed finite contributions including real zero and offset-equivalent timestamps", async () => {
+  const run = publication(); publications([run]); const raw = await report(LOCATION);
+  const e = explanation(run); e.validAt = "2026-10-17T00:00:00+06:00";
+  e.factors[0].value = 0; e.factors[0].effect = 0;
+  const forecast = [{ ...raw.forecast[0], explanation: e }];
+  assert.deepEqual(readAirReport({ ...raw, forecast }, LOCATION, nowMs).forecast[0].explanation, e);
+});
+
+test("A09 submillisecond fractions cannot impersonate an exact explanation hour", async () => {
+  const run = publication(); publications([run]); const raw = await report(LOCATION);
+  for (const validAt of ["2026-10-16T18:00:00.000001Z", "2026-10-17T00:00:00.000001+06:00"]) {
+    const forecast = [{ ...raw.forecast[0], explanation: { ...explanation(run), validAt } }];
+    const result = readAirReport({ ...raw, forecast }, LOCATION, nowMs);
+    assert.equal(result.forecast[0].explanation, undefined, validAt);
+    assert.equal(result.forecast[0].pm25, raw.forecast[0].pm25);
+  }
+});
+
+test("A09 parent point submillisecond fractions omit SHAP without altering PM or timestamp", async () => {
+  const run = publication(); publications([run]); const raw = await report(LOCATION);
+  for (const time of ["2026-10-16T18:00:00.000001Z", "2026-10-17T00:00:00.000001+06:00"]) {
+    const forecast = [{ ...raw.forecast[0], time }];
+    const point = readAirReport({ ...raw, forecast }, LOCATION, nowMs).forecast[0];
+    assert.equal(point.explanation, undefined, time);
+    assert.equal(point.pm25, raw.forecast[0].pm25);
+    assert.equal(point.time, time);
+  }
+  for (const time of ["2026-10-16T18:00:00.000000Z", "2026-10-17T00:00:00.000000+06:00"]) {
+    const forecast = [{ ...raw.forecast[0], time }];
+    const point = readAirReport({ ...raw, forecast }, LOCATION, nowMs).forecast[0];
+    assert.deepEqual(point.explanation, explanation(run), time);
+    assert.equal(point.pm25, raw.forecast[0].pm25);
+    assert.equal(point.time, time);
+  }
+});
+
+test("A09 explanation issuance preserves microseconds and equivalent timezone representations", async () => {
+  const run = publication(1, { issued_at: "2026-10-16T18:29:00.123456Z" });
+  publications([run]); const raw = await report(LOCATION);
+  const readWithIssue = (issuedAt) => readAirReport({ ...raw,
+    forecast: [{ ...raw.forecast[0], explanation: { ...explanation(run), issuedAt } }],
+  }, LOCATION, nowMs).forecast[0];
+  const mismatch = readWithIssue("2026-10-16T18:29:00.123457Z");
+  assert.equal(mismatch.explanation, undefined, "different microseconds are different issuances");
+  assert.equal(mismatch.pm25, raw.forecast[0].pm25);
+  for (const issuedAt of ["2026-10-16T18:29:00.1234560Z", "2026-10-17T00:29:00.123456+06:00",
+    "2026-10-16T13:29:00.123456-05:00"]) {
+    assert.equal(readWithIssue(issuedAt).explanation.issuedAt, issuedAt);
+  }
+  const wholeSecondRun = publication(); publications([wholeSecondRun]); const wholeSecondRaw = await report(LOCATION);
+  for (const issuedAt of [wholeSecondRun.issued_at.replace(".000Z", "Z"), wholeSecondRun.issued_at.replace(".000Z", ".000000Z")]) {
+    const result = readAirReport({ ...wholeSecondRaw,
+      forecast: [{ ...wholeSecondRaw.forecast[0], explanation: { ...explanation(wholeSecondRun), issuedAt } }],
+    }, LOCATION, nowMs);
+    assert.equal(result.forecast[0].explanation.issuedAt, issuedAt);
+  }
+});
+
+test("A09 mixed-run explanations are omitted without stitching attribution", async () => {
+  const run = publication(); publications([run]); const raw = await report(LOCATION);
+  const forecast = raw.forecast.map((p, i) => ({ ...p, explanation: { ...explanation(run, i), runId: i === 1 ? 2 : 1 } }));
+  const result = readAirReport({ ...raw, forecast }, LOCATION, nowMs);
+  assert.ok(result.forecast.every((p) => p.explanation === undefined));
+  assert.equal(result.forecast[1].pm25, raw.forecast[1].pm25);
+});
+
+test("A09 client omits explanations for CAMS, absent issuance, null readings, expired runs and non-Dhaka reports", async () => {
+  const run = publication(); publications([run]); const raw = await report(LOCATION);
+  const forecast = raw.forecast.map((p, i) => ({ ...p, explanation: explanation(run, i) }));
+  for (const overrides of [
+    { forecastSource: "cams", forecastIssuedAt: undefined }, { forecastIssuedAt: undefined },
+    { forecastIssuedAt: iso(nowMs - 3 * HOUR - 1) }, { inDhakaModelArea: false },
+    { forecast: forecast.map((p) => ({ ...p, pm25: null })) },
+  ]) {
+    const result = readAirReport({ ...raw, forecast, ...overrides }, LOCATION, nowMs);
+    assert.ok(result.forecast.every((p) => p.explanation === undefined));
+  }
+  const outside = { ...raw, ...OTHER, forecast, inDhakaModelArea: true };
+  assert.ok(readAirReport(outside, OTHER, nowMs).forecast.every((p) => p.explanation === undefined));
+});
+
+test("A09 source switching or wrong-location responses cannot retain old explanations", async () => {
+  const run = publication(); publications([run]); const first = await report(LOCATION);
+  assert.deepEqual(readAirReport(first, LOCATION, nowMs).forecast[0].explanation, explanation(run));
+  assert.throws(() => readAirReport(first, OTHER, nowMs));
+  const cams = { ...first, forecastSource: "cams", forecastIssuedAt: undefined };
+  assert.ok(readAirReport(cams, LOCATION, nowMs).forecast.every((p) => p.explanation === undefined));
 });
