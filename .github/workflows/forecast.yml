@@ -20,12 +20,23 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: "3.14"
           cache: pip
-      - run: python -B -m unittest discover -s jobs/tests -p test_refresh_forecast.py
-      - run: pip install -r jobs/requirements.txt
+          cache-dependency-path: jobs/requirements.txt
+      # Actions string equality ignores case. Reject non-exact values before
+      # any step receives publication secrets; Python's main/save guards remain.
+      - run: 'python -c "import os, sys; sys.exit(os.environ.get(''NIRMOL_ATOMIC_PUBLISHER_ENABLED'') != ''true'')"'
+        env:
+          NIRMOL_ATOMIC_PUBLISHER_ENABLED: ${{ vars.NIRMOL_ATOMIC_PUBLISHER_ENABLED }}
+      - run: 'python -m pip install --require-hashes --only-binary=:all: -r jobs/requirements.txt'
+      - run: python -m pip check
+      - run: python -B -m unittest discover -s jobs/tests
+      # Controlled native inference only; no providers, credentials or publication.
+      - run: python -B jobs/forecast_runtime.py
       - run: python jobs/refresh_forecast.py
         env:
           # Forward the operator's actual value; never hardcode an enabling default.

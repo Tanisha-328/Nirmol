@@ -56,26 +56,22 @@ def open_meteo(url: str, variables: list[str], prefix: str) -> pd.DataFrame:
 
 
 def load_models() -> tuple[dict[str, xgb.XGBRegressor], dict]:
-    import xgboost as xgb
-    models = {}
-    for name in ("p10", "p50", "p90"):
-        m = xgb.XGBRegressor()
-        m.load_model(ARTIFACTS / f"nirmol_xgb_v1_{name}.json")
-        models[name] = m
-    meta = json.loads((ARTIFACTS / "nirmol_xgb_v1_meta.json").read_text())
-    return models, meta
+    from forecast_runtime import load_models as load_checked_models
+    return load_checked_models(ARTIFACTS)
 
 
 def build_forecast() -> tuple[pd.DataFrame, dict, str]:
     import numpy as np
     import pandas as pd
-    import xgboost as xgb
+    from forecast_runtime import FEATURES, predict_checked
     from train_forecast import add_features  # Same preprocessing as training.
     models, meta = load_models()
     raw = open_meteo("https://air-quality-api.open-meteo.com/v1/air-quality", CAMS_VARS, "cams_").join(
         open_meteo("https://api.open-meteo.com/v1/forecast", WEATHER_VARS, ""), how="inner"
     )
-    X = add_features(raw)[meta["features"]]
+    X = add_features(raw)
+    if list(X.columns) != list(FEATURES):
+        raise RuntimeError("Preprocessing feature order differs from the saved-model contract.")
 
     issued_at = datetime.now(timezone.utc).isoformat()
     start = pd.Timestamp(issued_at).tz_convert(None).floor("h")
@@ -87,15 +83,18 @@ def build_forecast() -> tuple[pd.DataFrame, dict, str]:
         raise ValueError("Incomplete intended forecast window; not publishing.")
 
     adjust = meta.get("interval_log_adjust", 0.0)
-    p50 = models["p50"].predict(X)
+    predictions, all_contribs = predict_checked(models, X)
+    p50 = predictions["p50"]
     out = pd.DataFrame(index=X.index)
     out["pm25"] = np.expm1(p50)
-    out["low"] = np.expm1(np.minimum(models["p10"].predict(X) - adjust, p50))
-    out["high"] = np.expm1(np.maximum(models["p90"].predict(X) + adjust, p50))
+    out["low"] = np.expm1(np.minimum(predictions["p10"] - adjust, p50))
+    out["high"] = np.expm1(np.maximum(predictions["p90"] + adjust, p50))
+    if not np.isfinite(out.to_numpy()).all():
+        raise RuntimeError("Nonfinite transformed PM2.5 prediction; not publishing.")
     out["cams"] = raw.loc[X.index, "cams_pm2_5"]
 
     # Per-hour explanation: the 3 features that pushed this hour's prediction most.
-    contribs = models["p50"].get_booster().predict(xgb.DMatrix(X), pred_contribs=True)[:, :-1]
+    contribs = all_contribs[:, :-1]
     factors = []
     for row_c, (_, row_x) in zip(contribs, X.iterrows()):
         top = np.argsort(-np.abs(row_c))[:3]

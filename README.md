@@ -40,6 +40,13 @@ fall back to the former split-write path. Normal application reads and CAMS fall
 do not require this flag. Any future opt-in requires separate approval after real
 database verification; these local guards do not verify external environment settings.
 
+## Dependency and runtime verification
+
+Dependency security findings, the supported Python 3.14 hash-locked environment,
+offline native model checks and verification limits are documented in
+[the A12/A13 engineering report](docs/a12-a13-hardening.md). These checks do not
+enable the A06 publisher.
+
 ## Data attribution
 
 Weather and air-quality model data from [Open-Meteo](https://open-meteo.com/) (CC BY 4.0). Station data via [OpenAQ](https://openaq.org/). Routing by [openrouteservice](https://openrouteservice.org/). Map data © OpenStreetMap contributors.
