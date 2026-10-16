@@ -1,3 +1,48 @@
+# F10 in-app pollution alerts
+
+From `web`, run `node --test tests/alerts.test.mjs tests/alert-preferences.test.mjs`.
+For browser verification, build and serve a fresh production build, then run
+`node tests/alerts.browser.mjs C:/path/to/node_modules/playwright`. The suite uses
+controlled `/api/air` fixtures, not live providers, database publications or native
+model inference. Run the existing air/dashboard/F03/F04/F09/F14 suites as well.
+
+`evaluateAlerts(rawReport, location, preferences, nowMs, receivedAtMs)` reuses the
+shared AirReport validator. Keep receipt time fixed when advancing the page clock:
+future readings rejected on receipt must not age into current alerts. CAMS current
+data has the existing three-hour budget. Nirmol current additionally requires fresh
+issuance and its target hour to cover now; Nirmol forecasts require known fresh
+issuance. Retrieval is not model generation. No legacy issuance is invented.
+
+Thresholds are product preferences, not medical boundaries: presets 35/75/150,
+default 75 µg/m³; custom 0–2000 inclusive, with equality triggering an alert.
+Look-ahead is 6 (default), 12 or 24 hours. Only exact hourly forecast instants
+strictly after evaluation time and at/before its window end qualify. Consecutive
+qualifying points form groups; nulls, malformed rows, below-threshold points and
+source/time gaps split groups. Displayed group endpoints are first/last prediction
+instants, inclusive, not continuous exceedance intervals. No final-hour extension,
+interpolation, extrapolation, exposure formula or trend claim is introduced.
+
+Only versioned `{version:1,threshold,lookAheadHours}` preferences use this tab's
+`sessionStorage`, under `nirmol.alerts.v1`. No persistent mode exists. Corrupt/newer
+content stays untouched until explicit reset; failed writes/deletions preserve
+stored data and are disclosed. Blocked storage falls back to page memory. Browsers
+may restore/copy sessions; storage is not encrypted or account-isolated. No health
+or diary keys are accessed. Location restoration reads only the validated dashboard
+selection; changing the alert location does not rewrite that selection.
+
+Dismissals are bounded page-memory event IDs, never sent or saved. IDs exclude fetch
+and evaluation times, so unchanged refreshes retain dismissal; changed source,
+issuance, concentration, target points or preferences create a different event.
+Applying/resetting preferences, changing location, showing dismissed alerts or
+reloading clears dismissal. A CAMS republish with identical valid times and values
+cannot be distinguished because its issuance is unavailable.
+
+One air request runs after restoration; manual refresh/location changes start one
+new cancellable request with a 15-second UI deadline. There is no automatic network
+polling, push, service worker, delivery provider or closed-page monitoring. Open-page
+clock checks and visibility/focus listeners expire cached data without HTTP calls.
+No reporting route exists in this checkout; Member 02 integration remains pending.
+
 # Exposure checks
 
 From `web`, run `node --test tests/exposure.test.mjs`. These tests use Node's

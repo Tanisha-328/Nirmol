@@ -24,7 +24,8 @@ const WORDS = {
     exposure: "Personal exposure", exposureHint: "Compare duration and activity using the exposure indicator, separate from AQI.",
     travel: "Smart travel planner", travelHint: "Compare departure times within valid forecast coverage.",
     simulator: "What-if simulator", simulatorHint: "Compare hypothetical, current or forecast scenarios.",
-    diary: "Exposure diary", diaryHint: "Record your own activities with their original source and time." },
+    diary: "Exposure diary", diaryHint: "Record your own activities with their original source and time.",
+    alerts: "Pollution alerts", alertsHint: "Check current and forecast PM2.5 against your alert preference." },
   bn: { complete: "২৪ ঘণ্টার পূর্বাভাসের সময়সীমা", partial: "আংশিক পূর্বাভাস", coverage: "পূর্বাভাসের সময়সীমা",
     issued: "মডেল প্রকাশ", retrieved: "API থেকে তথ্য আনা", reading: "মানের বৈধ সময়", unknown: "উৎসের মডেল প্রকাশের সময় দেওয়া হয়নি; তথ্য আনার সময় মডেল তৈরির সময় নয়।",
     expired: "তথ্যের মেয়াদ শেষ। আবার তথ্য আনুন।", refresh: "আবার তথ্য আনুন", clock: "এশিয়া/ঢাকা সময়। সময়সীমা পূর্বাভাসের ঘণ্টা থেকে শুরু; এখন থেকে বাকি পূর্বাভাস ২৪ ঘণ্টার কম হতে পারে।",
@@ -35,7 +36,8 @@ const WORDS = {
     exposure: "ব্যক্তিগত এক্সপোজার", exposureHint: "AQI থেকে আলাদা এক্সপোজার সূচকে সময় ও কাজের ধরন তুলনা করুন।",
     travel: "যাত্রার সময় পরিকল্পনা", travelHint: "বৈধ পূর্বাভাসের সময়সীমার মধ্যে যাত্রার সময় তুলনা করুন।",
     simulator: "যদি এমন হয় সিমুলেটর", simulatorHint: "কাল্পনিক, বর্তমান বা পূর্বাভাসের পরিস্থিতি তুলনা করুন।",
-    diary: "এক্সপোজার ডায়েরি", diaryHint: "নিজের কাজের বিবরণ মূল উৎস ও সময়সহ লিখে রাখুন।" },
+    diary: "এক্সপোজার ডায়েরি", diaryHint: "নিজের কাজের বিবরণ মূল উৎস ও সময়সহ লিখে রাখুন।",
+    alerts: "দূষণের সতর্কবার্তা", alertsHint: "পছন্দের সীমার সঙ্গে বর্তমান ও পূর্বাভাসের PM2.5 তুলনা করুন।" },
 };
 
 export function Dashboard() {
@@ -312,7 +314,8 @@ function Actions({ current, forecast }: { current: boolean; forecast: boolean })
     <p className="mt-2 text-xs text-[var(--muted)]">{words.confirm}</p>
     <div className="mt-3 grid gap-3 sm:grid-cols-2">
       {[["/exposure", words.exposure, words.exposureHint], ["/travel", words.travel, words.travelHint],
-        ["/simulator", words.simulator, words.simulatorHint], ["/diary", words.diary, words.diaryHint]].map(([href, title, hint]) =>
+        ["/simulator", words.simulator, words.simulatorHint], ["/diary", words.diary, words.diaryHint],
+        ["/alerts", words.alerts, words.alertsHint]].map(([href, title, hint]) =>
         <Link key={href} href={href} prefetch={false} className="min-w-0 rounded-xl border border-[var(--border)] p-3">
           <span className="font-semibold text-[var(--accent)] underline">{title} →</span>
           <span className="mt-1 block text-xs leading-relaxed text-[var(--muted)]">{hint}</span>
