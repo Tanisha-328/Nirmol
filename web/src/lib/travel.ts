@@ -6,7 +6,7 @@ import {
 
 const HOUR = 3_600_000;
 const MINUTE = 60_000;
-export type TravelAir = Pick<AirReport, "lat" | "lon" | "forecast" | "forecastSource" | "fetchedAt">;
+export type TravelAir = Pick<AirReport, "lat" | "lon" | "forecast" | "forecastSource" | "fetchedAt" | "forecastIssuedAt">;
 export type TravelOption = ExposureResult & { departureMs: number; arrivalMs: number };
 export type TravelPlan = { options: TravelOption[]; excluded: number; considered: number };
 
@@ -36,7 +36,10 @@ export function parseDhakaInput(value: string): number {
 
 export function isFreshTravelReport(report: TravelAir, nowMs: number): boolean {
   const fetchedMs = absoluteTime(report.fetchedAt);
-  return Number.isFinite(nowMs) && fetchedMs <= nowMs + MINUTE && nowMs - fetchedMs <= 3 * HOUR;
+  const issuedMs = absoluteTime(report.forecastIssuedAt);
+  return Number.isFinite(nowMs) && fetchedMs <= nowMs + MINUTE && nowMs - fetchedMs <= 3 * HOUR &&
+    (report.forecastIssuedAt === undefined || (report.forecastSource === "nirmol" &&
+      issuedMs <= nowMs + MINUTE && nowMs - issuedMs <= 3 * HOUR));
 }
 
 /** Validate only the forecast fields consumed here, never infer them from `now`. */
@@ -47,7 +50,8 @@ export function readTravelAir(value: unknown, location: { lat: number; lon: numb
       !Number.isFinite(data.lat) || !Number.isFinite(data.lon) ||
       Math.abs(data.lat - location.lat) > 0.0001 || Math.abs(data.lon - location.lon) > 0.0001 ||
       (data.forecastSource !== "cams" && data.forecastSource !== "nirmol") ||
-      typeof data.fetchedAt !== "string" || !Array.isArray(data.forecast) || data.forecast.length > 25) {
+      typeof data.fetchedAt !== "string" || !Array.isArray(data.forecast) || data.forecast.length > 25 ||
+      (data.forecastIssuedAt !== undefined && typeof data.forecastIssuedAt !== "string")) {
     throw new Error("Invalid forecast provenance or location");
   }
   const forecast = data.forecast.map((point: unknown): ForecastPoint => {
@@ -59,6 +63,7 @@ export function readTravelAir(value: unknown, location: { lat: number; lon: numb
   });
   const report: TravelAir = {
     lat: data.lat, lon: data.lon, forecast, forecastSource: data.forecastSource, fetchedAt: data.fetchedAt,
+    ...(typeof data.forecastIssuedAt === "string" ? { forecastIssuedAt: data.forecastIssuedAt } : {}),
   };
   if (!isFreshTravelReport(report, nowMs)) throw new Error("Stale or future-dated forecast response");
   return report;

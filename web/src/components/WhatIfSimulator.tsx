@@ -33,10 +33,10 @@ const WORDS = {
     clock: "All departures use Asia/Dhaka (UTC+06:00), regardless of your device timezone. Choose the next date when crossing midnight.",
     source: "Source and timestamps", example: "User-entered hypothetical values — not live or measured data.",
     cams: "Model estimate — CAMS (Copernicus) via Open-Meteo", nirmol: "Model estimate — CAMS corrected by Nirmol",
-    reading: "Current reading time", fetched: "API response fetched", forecastTimes: "Forecast timestamps", currentPm: "Current PM2.5",
+    reading: "Current reading time", fetched: "API response fetched", issued: "Model issued", forecastTimes: "Forecast timestamps", currentPm: "Current PM2.5",
     currentNote: "Both scenarios use the same current estimate, held constant over each duration. This is not a forecast of future conditions.",
     forecastNote: "Hourly forecast exposure uses the travel planner's overlap calculation: each value is held until the next hourly timestamp, with valid readings at both ends. No gaps are filled and nothing is extrapolated beyond the final point. Minute departures do not add forecast resolution.",
-    forecastLimit: "CAMS values represent valid instants; Nirmol's target hour is labelled by its start. Fetch time is not model issue time; the API does not supply model issue time. Forecasts can be wrong and local pollution may differ. This is not street-level route comparison.",
+    forecastLimit: "CAMS values represent valid instants; Nirmol's target hour is labelled by its start. Fetch time is not model issue time. Model issue time is shown when available; otherwise it is unknown. Forecasts can be wrong and local pollution may differ. This is not street-level route comparison.",
     disclaimer: "Differences and percentages compare the exposure indicator, not medical risk. This is not AQI, inhaled dose, a diagnosis or a guarantee of safety. Category cutoffs are provisional Nirmol prototype values, not validated WHO/EPA or clinical standards.",
     rounding: "Values are rounded only for display; comparisons use unrounded calculations.",
     sensitive: "Age and sensitivity change only the provisional categories, not the indicator calculation.",
@@ -60,10 +60,10 @@ const WORDS = {
     clock: "আপনার যন্ত্রের সময় অঞ্চল যা-ই হোক, সব যাত্রা Asia/Dhaka (UTC+06:00) সময়ে। মধ্যরাত পার হলে পরের তারিখ বাছুন।",
     source: "তথ্যের উৎস ও সময়", example: "নিজের দেওয়া কাল্পনিক মান — লাইভ বা পরিমাপ করা তথ্য নয়।",
     cams: "মডেলের প্রাক্কলন — Open-Meteo থেকে CAMS (Copernicus)", nirmol: "মডেলের প্রাক্কলন — নির্মল-সংশোধিত CAMS",
-    reading: "বর্তমান তথ্যের সময়", fetched: "API থেকে তথ্য আনার সময়", forecastTimes: "পূর্বাভাসের সময়সীমা", currentPm: "বর্তমান PM2.5",
+    reading: "বর্তমান তথ্যের সময়", fetched: "API থেকে তথ্য আনার সময়", issued: "মডেল প্রকাশের সময়", forecastTimes: "পূর্বাভাসের সময়সীমা", currentPm: "বর্তমান PM2.5",
     currentNote: "দুই পরিস্থিতিতে একই বর্তমান প্রাক্কলন নিজ নিজ সময়কালজুড়ে স্থির ধরা হয়েছে। এটি ভবিষ্যৎ পরিস্থিতির পূর্বাভাস নয়।",
     forecastNote: "ঘণ্টাভিত্তিক পূর্বাভাসে ট্রাভেল প্ল্যানারের সময়ের অংশ অনুযায়ী হিসাব ব্যবহার হয়: পরের ঘণ্টা পর্যন্ত আগের মান স্থির ধরা হয়, দুই প্রান্তেই বৈধ তথ্য লাগে। ফাঁক পূরণ বা শেষ মানের পর সময় বাড়ানো হয় না। প্রতি মিনিটে যাত্রার বিকল্প মানে প্রতি মিনিটের বায়ুর পূর্বাভাস নয়।",
-    forecastLimit: "CAMS-এর সময় নির্দিষ্ট মুহূর্ত বোঝায়; নির্মলের লক্ষ্য ঘণ্টার শুরুর সময় দিয়ে চিহ্নিত। তথ্য আনার সময় মডেল প্রকাশের সময় নয়; API মডেল প্রকাশের সময় দেয় না। পূর্বাভাস ভুল হতে পারে, স্থানীয় দূষণ ভিন্ন হতে পারে। এটি রাস্তার দূষণভিত্তিক পথের তুলনা নয়।",
+    forecastLimit: "CAMS-এর সময় নির্দিষ্ট মুহূর্ত বোঝায়; নির্মলের লক্ষ্য ঘণ্টার শুরুর সময় দিয়ে চিহ্নিত। তথ্য আনার সময় মডেল প্রকাশের সময় নয়। মডেল প্রকাশের সময় পাওয়া গেলে দেখানো হয়; অন্যথায় তা অজানা। পূর্বাভাস ভুল হতে পারে, স্থানীয় দূষণ ভিন্ন হতে পারে। এটি রাস্তার দূষণভিত্তিক পথের তুলনা নয়।",
     disclaimer: "পার্থক্য ও শতকরা মান এক্সপোজার সূচকের তুলনা, রোগের ঝুঁকির তুলনা নয়। এটি AQI, শ্বাসের মাধ্যমে গৃহীত মাত্রা, রোগ নির্ণয় বা নিরাপত্তার নিশ্চয়তা নয়। শ্রেণির সীমাগুলো নির্মলের পরীক্ষামূলক নিয়ম, যাচাইকৃত WHO/EPA বা চিকিৎসাগত মান নয়।",
     rounding: "শুধু প্রদর্শনের জন্য মান গোল করা হয়; তুলনায় মূল হিসাব ব্যবহার হয়।",
     sensitive: "বয়স ও সংবেদনশীলতা শুধু পরীক্ষামূলক শ্রেণি বদলায়, সূচকের মূল হিসাব নয়।",
@@ -186,6 +186,7 @@ export function WhatIfSimulator() {
   });
   const signed = (value: number) => num(`${value > 0 ? "+" : ""}${value.toFixed(1)}`);
   const forecastTimes = live?.mode === "forecast" ? live.data.forecast.map((p) => p.time).sort((a, b) => Date.parse(a) - Date.parse(b)) : [];
+  const issuedAt = live?.mode === "current" ? live.data.now.issuedAt : live?.data.forecastIssuedAt;
 
   return <main className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 pb-16 pt-5" lang={lang}>
     <header className="flex items-center justify-between gap-3">
@@ -275,6 +276,7 @@ export function WhatIfSimulator() {
         {live.mode === "current" && <><p>{t.currentPm}: {num(live.data.now.pm25.toFixed(1))} µg/m³</p>
           <p>{t.reading}: <time dateTime={live.data.now.time}>{formatTime(live.data.now.time)}</time></p></>}
         <p>{t.fetched}: <time dateTime={live.data.fetchedAt}>{formatTime(live.data.fetchedAt)}</time></p>
+        {issuedAt && <p>{t.issued}: <time dateTime={issuedAt}>{formatTime(issuedAt)}</time></p>}
         {forecastTimes.length > 0 && <p>{t.forecastTimes}: <time dateTime={forecastTimes[0]}>{formatTime(forecastTimes[0])}</time> → <time dateTime={forecastTimes[forecastTimes.length - 1]}>{formatTime(forecastTimes[forecastTimes.length - 1])}</time></p>}
       </>}
       {mode === "current" && <p>{t.currentNote}</p>}

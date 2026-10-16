@@ -1,6 +1,8 @@
 // US EPA AQI for PM2.5 (2024 breakpoints). PM2.5 in µg/m³ stays the main number;
 // AQI is shown as a labelled secondary value computed from the hourly concentration.
 
+import { isValidConcentration } from "./exposure";
+
 export type AqiLevel = "good" | "moderate" | "usg" | "unhealthy" | "very_unhealthy" | "hazardous";
 
 const BREAKPOINTS: { cLo: number; cHi: number; iLo: number; iHi: number; level: AqiLevel }[] = [
@@ -12,7 +14,8 @@ const BREAKPOINTS: { cLo: number; cHi: number; iLo: number; iHi: number; level: 
   { cLo: 225.5, cHi: 325.4, iLo: 301, iHi: 500, level: "hazardous" },
 ];
 
-export function pm25ToAqi(pm25: number): { aqi: number; level: AqiLevel } {
+export function pm25ToAqi(pm25: unknown): { aqi: number; level: AqiLevel } | null {
+  if (!isValidConcentration(pm25)) return null;
   const c = Math.floor(pm25 * 10) / 10; // EPA truncates to one decimal
   const bp = BREAKPOINTS.find((b) => c <= b.cHi) ?? BREAKPOINTS[BREAKPOINTS.length - 1];
   const capped = Math.min(c, bp.cHi);

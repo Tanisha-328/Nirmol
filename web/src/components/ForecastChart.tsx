@@ -14,11 +14,17 @@ function hourLabel(iso: string, lang: "bn" | "en") {
 
 export function ForecastChart({ points }: { points: ForecastPoint[] }) {
   const { lang, t, num } = useI18n();
-  const data = points.map((p) => ({
-    label: hourLabel(p.time, lang),
-    pm25: p.pm25 == null ? null : Math.round(p.pm25),
-    range: p.low != null && p.high != null ? [Math.round(p.low), Math.round(p.high)] : null,
-  }));
+  const data = points.flatMap((p, i) => {
+    const point = {
+      label: hourLabel(p.time, lang),
+      pm25: p.pm25 == null ? null : Math.round(p.pm25),
+      range: p.low != null && p.high != null ? [Math.round(p.low), Math.round(p.high)] : null,
+    };
+    // A missing timestamp is a gap too. Break the line without adding an API
+    // reading or interpolating concentration between the surviving points.
+    return i > 0 && Date.parse(p.time) - Date.parse(points[i - 1].time) !== 3_600_000
+      ? [{ label: "…", pm25: null, range: null }, point] : [point];
+  });
   const hasRange = data.some((d) => d.range);
 
   return (

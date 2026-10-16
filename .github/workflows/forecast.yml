@@ -5,15 +5,26 @@ on:
     - cron: "5 * * * *"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: nirmol-forecast-dhaka
+  cancel-in-progress: false
+
 jobs:
   forecast:
+    # Opt in only after the migration/RPC and manifest reader are verified.
+    if: ${{ vars.NIRMOL_ATOMIC_PUBLISHER_ENABLED == 'true' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: pip
+      - run: python -B -m unittest discover -s jobs/tests -p test_refresh_forecast.py
       - run: pip install -r jobs/requirements.txt
       - run: python jobs/refresh_forecast.py
         env:

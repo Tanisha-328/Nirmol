@@ -9,21 +9,20 @@ Usage:
     py jobs/refresh_forecast.py                # needs NEXT_PUBLIC_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY
 """
 
+from __future__ import annotations
+
 import argparse
 import json
+import math
 import os
+import re
 import sys
 from datetime import datetime, timedelta, timezone
+from numbers import Real
 from pathlib import Path
-
-import numpy as np
-import pandas as pd
-import requests
-import xgboost as xgb
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "ml"))
-from train_forecast import add_features  # noqa: E402  (same features as training)
 
 ARTIFACTS = ROOT / "ml" / "artifacts"
 MODEL = "nirmol-xgb-v1"
@@ -40,6 +39,8 @@ WEATHER_VARS = [
 
 
 def open_meteo(url: str, variables: list[str], prefix: str) -> pd.DataFrame:
+    import pandas as pd
+    import requests
     # past_days=2 so the 24h rolling features have history behind the first forecast hour.
     resp = requests.get(
         url,
@@ -54,6 +55,7 @@ def open_meteo(url: str, variables: list[str], prefix: str) -> pd.DataFrame:
 
 
 def load_models() -> tuple[dict[str, xgb.XGBRegressor], dict]:
+    import xgboost as xgb
     models = {}
     for name in ("p10", "p50", "p90"):
         m = xgb.XGBRegressor()
@@ -63,17 +65,25 @@ def load_models() -> tuple[dict[str, xgb.XGBRegressor], dict]:
     return models, meta
 
 
-def build_forecast() -> tuple[pd.DataFrame, dict]:
+def build_forecast() -> tuple[pd.DataFrame, dict, str]:
+    import numpy as np
+    import pandas as pd
+    import xgboost as xgb
+    from train_forecast import add_features  # Same preprocessing as training.
     models, meta = load_models()
     raw = open_meteo("https://air-quality-api.open-meteo.com/v1/air-quality", CAMS_VARS, "cams_").join(
         open_meteo("https://api.open-meteo.com/v1/forecast", WEATHER_VARS, ""), how="inner"
     )
     X = add_features(raw)[meta["features"]]
 
-    now = pd.Timestamp.now(tz="UTC").tz_localize(None).floor("h")
-    X = X[(X.index >= now) & X.notna().all(axis=1)].head(HOURS)
-    if len(X) < 12:
-        raise RuntimeError(f"Only {len(X)} usable forecast hours from Open-Meteo; not saving.")
+    issued_at = datetime.now(timezone.utc).isoformat()
+    start = pd.Timestamp(issued_at).tz_convert(None).floor("h")
+    if not X.index.is_unique:
+        raise ValueError("Duplicate forecast input hours; not publishing.")
+    # Missing target hours must fail, rather than shifting later hours into them.
+    X = X.reindex(pd.date_range(start, periods=HOURS, freq="h"))
+    if not np.isfinite(X.to_numpy(dtype=float)).all():
+        raise ValueError("Incomplete intended forecast window; not publishing.")
 
     adjust = meta.get("interval_log_adjust", 0.0)
     p50 = models["p50"].predict(X)
@@ -93,64 +103,165 @@ def build_forecast() -> tuple[pd.DataFrame, dict]:
             for i in top
         ])
     out["factors"] = factors
-    return out, meta
+    return out, meta, issued_at
 
 
-def save(forecast: pd.DataFrame, meta: dict) -> None:
+def absolute_time(value: object) -> datetime:
+    pattern = r"\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d{1,6})?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)"
+    if not isinstance(value, str) or not re.fullmatch(pattern, value):
+        raise ValueError("Invalid absolute publication timestamp")
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(timezone.utc)
+    except (ValueError, OverflowError):
+        raise ValueError("Invalid absolute publication timestamp") from None
+
+
+def finite(value: object) -> bool:
+    try:
+        return type(value) in (int, float) and math.isfinite(value)
+    except OverflowError:
+        return False
+
+
+def concentration(value: object) -> bool:
+    return finite(value) and 0 <= value <= 2000
+
+
+def validate_publication(payload: dict, now: datetime | None = None) -> None:
+    """Pure publication validation. This does not establish database atomicity."""
+    now = now or datetime.now(timezone.utc)
+    keys = {"model", "area", "issued_at", "forecast_start", "metrics", "points"}
+    if not isinstance(payload, dict) or set(payload) != keys or payload["model"] != MODEL or payload["area"] != "dhaka":
+        raise ValueError("Invalid publication identity")
+    issued, start = absolute_time(payload["issued_at"]), absolute_time(payload["forecast_start"])
+    if issued > now + timedelta(minutes=1) or now - issued > timedelta(hours=3) or start.minute or start.second or start.microsecond:
+        raise ValueError("Invalid publication issuance or start")
+    metrics = payload["metrics"]
+    if not isinstance(metrics, dict) or set(metrics) != {"test_mae", "cams_test_mae", "interval_coverage", "trained_at"}:
+        raise ValueError("Missing publication metrics")
+    if any(not finite(metrics[k]) or metrics[k] < 0 for k in ("test_mae", "cams_test_mae", "interval_coverage")) or metrics["interval_coverage"] > 1:
+        raise ValueError("Invalid publication metrics")
+    if absolute_time(metrics["trained_at"]) > issued + timedelta(minutes=1):
+        raise ValueError("Invalid model training timestamp")
+    points = payload["points"]
+    if not isinstance(points, list) or len(points) != HOURS:
+        raise ValueError("Exactly 25 publication hours are required")
+    for i, point in enumerate(points):
+        if not isinstance(point, dict) or set(point) != {"valid_at", "pm25_ugm3", "pm25_low", "pm25_high", "top_factors"}:
+            raise ValueError("Missing or unexpected publication point fields")
+        if absolute_time(point["valid_at"]) != start + timedelta(hours=i):
+            raise ValueError("Publication hours must match the original window")
+        if any(not concentration(point[k]) for k in ("pm25_ugm3", "pm25_low", "pm25_high")) or not point["pm25_low"] <= point["pm25_ugm3"] <= point["pm25_high"]:
+            raise ValueError("Invalid publication concentration or range")
+        if any(round(point[k], 2) != point[k] for k in ("pm25_ugm3", "pm25_low", "pm25_high")):
+            raise ValueError("Publication concentration exceeds storage precision")
+        shap = point["top_factors"]
+        if not isinstance(shap, dict) or set(shap) != {"factors", "cams_pm25"} or not concentration(shap["cams_pm25"]):
+            raise ValueError("Invalid SHAP source metadata")
+        factors = shap["factors"]
+        if not isinstance(factors, list) or len(factors) != 3:
+            raise ValueError("Three SHAP factors are required")
+        names = set()
+        for factor in factors:
+            if not isinstance(factor, dict) or set(factor) != {"feature", "value", "effect"} or not isinstance(factor["feature"], str) or not re.fullmatch(r"[a-z][a-z0-9_]{0,79}", factor["feature"]) or not finite(factor["value"]) or not finite(factor["effect"]):
+                raise ValueError("Invalid SHAP factor")
+            names.add(factor["feature"])
+        if len(names) != 3:
+            raise ValueError("Duplicate SHAP factors")
+
+
+def publication_payload(forecast: pd.DataFrame, meta: dict, issued_at: str, *, now: datetime | None = None) -> dict:
+    if meta.get("model") != MODEL:
+        raise ValueError("Unsupported model metadata")
+    points = []
+    start = absolute_time(issued_at).replace(minute=0, second=0, microsecond=0)
+    for i, (t, row) in enumerate(forecast.iterrows()):
+        target = t.replace(tzinfo=timezone.utc) if t.tzinfo is None else t.astimezone(timezone.utc)
+        if target != start + timedelta(hours=i):
+            raise ValueError("Unexpected raw forecast timestamp")
+        values = (row.pm25, row.low, row.high, row.cams)
+        if any(isinstance(v, bool) or not isinstance(v, Real) for v in values):
+            raise ValueError("Nonnumeric raw forecast prediction")
+        pm, low, high, cams = (float(v) for v in values)
+        # Validate raw predictions before rounding can disguise small negatives.
+        if not all(concentration(v) for v in (pm, low, high, cams)) or not low <= pm <= high:
+            raise ValueError("Invalid unrounded forecast prediction")
+        points.append({"valid_at": target.strftime("%Y-%m-%dT%H:%M:%SZ"), "pm25_ugm3": round(pm, 1),
+                       "pm25_low": round(low, 1), "pm25_high": round(high, 1),
+                       "top_factors": {"factors": row.factors, "cams_pm25": round(cams, 1)}})
+    payload = {"model": MODEL, "area": "dhaka", "issued_at": issued_at, "forecast_start": start.isoformat(),
+               "metrics": {"test_mae": meta["metrics_test"]["nirmol_model"]["mae"],
+                           "cams_test_mae": meta["metrics_test"]["raw_cams"]["mae"],
+                           "interval_coverage": meta["interval_p10_p90_coverage"], "trained_at": meta["trained_at"]}, "points": points}
+    validate_publication(payload, now)
+    # Detach factor lists from the model frame and prohibit non-standard JSON.
+    return json.loads(json.dumps(payload, allow_nan=False))
+
+
+def save(payload: dict, *, transport=None, now: datetime | None = None) -> int:
+    validate_publication(payload, now)
+    frozen = json.dumps({"payload": payload}, allow_nan=False, separators=(",", ":"))
+    payload = json.loads(frozen)["payload"]
+    if transport is None:
+        import requests
+        transport = requests
     url = os.environ["NEXT_PUBLIC_SUPABASE_URL"].rstrip("/")
     key = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
     headers = {"apikey": key, "Authorization": f"Bearer {key}", "Content-Type": "application/json"}
-
-    run = requests.post(
-        f"{url}/rest/v1/forecast_runs",
-        headers={**headers, "Prefer": "return=representation"},
-        json={
-            "model": MODEL,
-            "area": "dhaka",
-            "metrics": {
-                "test_mae": meta["metrics_test"]["nirmol_model"]["mae"],
-                "cams_test_mae": meta["metrics_test"]["raw_cams"]["mae"],
-                "interval_coverage": meta["interval_p10_p90_coverage"],
-                "trained_at": meta["trained_at"],
-            },
-        },
-        timeout=30,
-    )
-    run.raise_for_status()
-    run_id = run.json()[0]["id"]
-
-    points = [
-        {
-            "run_id": run_id,
-            "valid_at": t.strftime("%Y-%m-%dT%H:%M:%SZ"),
-            "pm25_ugm3": round(float(r.pm25), 1),
-            "pm25_low": round(float(r.low), 1),
-            "pm25_high": round(float(r.high), 1),
-            "top_factors": {"factors": r.factors, "cams_pm25": round(float(r.cams), 1)},
-        }
-        for t, r in forecast.iterrows()
-    ]
-    requests.post(f"{url}/rest/v1/forecast_points", headers=headers, json=points, timeout=30).raise_for_status()
-
-    # Old runs are not needed by the app; points are removed by ON DELETE CASCADE.
-    cutoff = (datetime.now(timezone.utc) - timedelta(days=KEEP_DAYS)).strftime("%Y-%m-%dT%H:%M:%SZ")
-    requests.delete(f"{url}/rest/v1/forecast_runs?issued_at=lt.{cutoff}", headers=headers, timeout=30).raise_for_status()
-    print(f"Saved run {run_id} with {len(points)} hours.")
+    # Only this immutable, idempotent RPC may be replayed. A missing RPC never
+    # falls back to the old two-request publisher. No response body is logged.
+    run_id = None
+    for attempt in range(2):
+        try:
+            response = transport.post(f"{url}/rest/v1/rpc/publish_nirmol_forecast", headers=headers, data=frozen, timeout=30, allow_redirects=False)
+            if 300 <= response.status_code < 500:
+                raise RuntimeError(f"Forecast publication rejected (HTTP {response.status_code}).")
+            if response.status_code >= 500:
+                continue
+            result = response.json()
+            clock = now or datetime.now(timezone.utc)
+            if not isinstance(result, dict) or type(result.get("run_id")) is not int or not 0 < result["run_id"] <= 2**53 - 1 or type(result.get("replayed")) is not bool:
+                continue
+            published = absolute_time(result.get("published_at"))
+            if absolute_time(result.get("issued_at")) != absolute_time(payload["issued_at"]) or absolute_time(result.get("forecast_start")) != absolute_time(payload["forecast_start"]) or published > clock + timedelta(minutes=1) or published < absolute_time(payload["issued_at"]) - timedelta(minutes=1):
+                continue
+            run_id = result["run_id"]
+            break
+        except (transport.exceptions.Timeout, transport.exceptions.ConnectionError, ValueError, TypeError):
+            if attempt == 1:
+                break
+    if run_id is None:
+        raise RuntimeError("Forecast publication outcome unconfirmed after bounded idempotent replay.") from None
+    # Cleanup cannot change the confirmed publication outcome. Never delete
+    # another model/area's history; do not retry publication if cleanup fails.
+    cutoff = ((now or datetime.now(timezone.utc)) - timedelta(days=KEEP_DAYS)).isoformat()
+    try:
+        cleanup = transport.delete(f"{url}/rest/v1/forecast_runs", headers=headers,
+                                   params={"model": f"eq.{MODEL}", "area": "eq.dhaka", "issued_at": f"lt.{cutoff}"},
+                                   timeout=30, allow_redirects=False)
+        if not 200 <= cleanup.status_code < 300:
+            raise RuntimeError("Scoped forecast cleanup did not succeed.")
+    except Exception:
+        print("Forecast publication confirmed; scoped cleanup failed.", file=sys.stderr)
+    print(f"Confirmed forecast publication {run_id} with {HOURS} hours.")
+    return run_id
 
 
 def main() -> None:
+    import pandas as pd
     parser = argparse.ArgumentParser()
     parser.add_argument("--dry-run", action="store_true", help="print the forecast without saving")
     args = parser.parse_args()
 
-    forecast, meta = build_forecast()
+    forecast, meta, issued_at = build_forecast()
+    payload = publication_payload(forecast, meta, issued_at)
     dhaka = forecast.index + pd.Timedelta(hours=6)
     print(f"{'Dhaka time':<17} {'Nirmol':>7} {'range':>11} {'CAMS':>6}  top factor")
     for t, r in zip(dhaka, forecast.itertuples()):
         f = r.factors[0]
         print(f"{t:%a %H:%M}{'':<7} {r.pm25:7.0f} {r.low:5.0f}-{r.high:<5.0f} {r.cams:6.0f}  {f['feature']} ({f['effect']:+.2f})")
     if not args.dry_run:
-        save(forecast, meta)
+        save(payload)
 
 
 if __name__ == "__main__":

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { AirReport } from "@/lib/air";
+import { isFreshModelIssue } from "@/lib/air-validation";
 import {
   ACTIVITY_FACTORS,
   calculateExposure,
@@ -107,10 +108,13 @@ function readCurrentAir(value: unknown, location: Location): CurrentAir {
       current.kind === "measured") {
     throw new Error("Unexpected current air-quality reading");
   }
+  if (current.issuedAt !== undefined && (current.source !== "nirmol" || typeof current.issuedAt !== "string" ||
+      !isFreshModelIssue(current.issuedAt, Date.now()))) throw new Error("Invalid current model issuance");
   return {
     lat: data.lat, lon: data.lon,
     receivedAtMs: Date.now(),
-    now: { pm25: current.pm25, time: current.time, kind: current.kind, source: current.source },
+    now: { pm25: current.pm25, time: current.time, kind: current.kind, source: current.source,
+      ...(typeof current.issuedAt === "string" ? { issuedAt: current.issuedAt } : {}) },
   };
 }
 
@@ -205,7 +209,8 @@ export function ExposureCalculator() {
     // Check receipt time too: a rejected forecast must not become "current"
     // merely because the page's clock eventually catches up with it.
     isValidConcentration(air.now.pm25) && isUsableCurrentEstimate(air.now.time, air.receivedAtMs) &&
-    isUsableCurrentEstimate(air.now.time, nowMs)
+    isUsableCurrentEstimate(air.now.time, nowMs) &&
+    (air.now.issuedAt === undefined || isFreshModelIssue(air.now.issuedAt, nowMs))
     ? { ...air.now, pm25: air.now.pm25 } : null;
   const usable = current !== null;
   const outdoorHours = hoursInput.trim() === "" ? NaN : Number(hoursInput);

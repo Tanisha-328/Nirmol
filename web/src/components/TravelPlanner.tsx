@@ -31,7 +31,7 @@ const WORDS = {
     compared: "Valid choices compared", excluded: "Excluded choices (past, outside 24 hours, or incomplete coverage)",
     resolution: "Departure choices are compared every minute, including both window endpoints. The forecast remains hourly; minute choices are not minute-by-minute air-quality predictions.",
     source: "Forecast source", cams: "Model estimate — CAMS (Copernicus) via Open-Meteo", nirmol: "Model estimate — CAMS corrected by Nirmol",
-    fetched: "API response fetched", coverage: "Forecast timestamps", run: "Model issue time is not supplied by this API. Fetch time is not model issue time. These are forecast estimates, not measurements.",
+    fetched: "API response fetched", issued: "Model issued", coverage: "Forecast timestamps", run: "Model issue time is shown when available; otherwise it is unknown. Fetch time is not model issue time. These are forecast estimates, not measurements.",
     method: "CAMS timestamps identify valid instants; Nirmol targets an hour labelled by its start. For comparison, each value is held constant until the next hourly timestamp, requiring valid readings at both ends. Exposure sums PM2.5 × overlapping hours × activity factor. No gaps are filled and the final point is not extended.",
     limits: "Forecasts can be wrong and local pollution can differ. This compares departure times at one location, not street-level routes. It does not account for indoor air, traffic along a route or vehicle filtration.",
     provisional: "Categories use provisional Nirmol prototype cutoffs, not validated WHO/EPA or clinical thresholds. The indicator is not AQI, inhaled dose, a medical risk percentage or a guarantee of safety.",
@@ -55,7 +55,7 @@ const WORDS = {
     compared: "তুলনা করা বৈধ বিকল্প", excluded: "বাদ দেওয়া বিকল্প (অতীত, ২৪ ঘণ্টার বাইরে বা অসম্পূর্ণ তথ্য)",
     resolution: "প্রথম ও শেষ সময়সহ প্রতি মিনিটে যাত্রা শুরুর বিকল্প তুলনা করা হয়। পূর্বাভাস ঘণ্টাভিত্তিক; এগুলো প্রতি মিনিটের বায়ুর পূর্বাভাস নয়।",
     source: "পূর্বাভাসের উৎস", cams: "মডেলের প্রাক্কলন — Open-Meteo থেকে CAMS (Copernicus)", nirmol: "মডেলের প্রাক্কলন — নির্মল-সংশোধিত CAMS",
-    fetched: "API থেকে তথ্য আনার সময়", coverage: "পূর্বাভাসের সময়সীমা", run: "এই API মডেল প্রকাশের সময় দেয় না। তথ্য আনার সময় মডেল প্রকাশের সময় নয়। এগুলো পূর্বাভাস, পরিমাপ নয়।",
+    fetched: "API থেকে তথ্য আনার সময়", issued: "মডেল প্রকাশের সময়", coverage: "পূর্বাভাসের সময়সীমা", run: "মডেল প্রকাশের সময় পাওয়া গেলে দেখানো হয়; অন্যথায় তা অজানা। তথ্য আনার সময় মডেল প্রকাশের সময় নয়। এগুলো পূর্বাভাস, পরিমাপ নয়।",
     method: "CAMS-এর সময় নির্দিষ্ট মুহূর্ত বোঝায়; নির্মলের লক্ষ্য ঘণ্টার শুরুর সময় দিয়ে চিহ্নিত। তুলনার জন্য পরের ঘণ্টা পর্যন্ত আগের মান স্থির ধরা হয়, দুই প্রান্তেই বৈধ তথ্য থাকতে হয়। PM2.5 × সংশ্লিষ্ট ঘণ্টার অংশ × কাজের গুণক যোগ করে হিসাব হয়। অনুপস্থিত তথ্য পূরণ বা শেষ মানের পরে সময় বাড়ানো হয় না।",
     limits: "পূর্বাভাস ভুল হতে পারে, স্থানীয় দূষণ আলাদা হতে পারে। এটি একটি এলাকার যাত্রা শুরুর সময়ের তুলনা, রাস্তার দূষণভিত্তিক পথ নির্বাচন নয়। ঘরের বাতাস, পথের যানজট বা গাড়ির ফিল্টার হিসাবে নেই।",
     provisional: "শ্রেণির সীমাগুলো নির্মলের পরীক্ষামূলক নিয়ম; যাচাইকৃত WHO/EPA বা চিকিৎসাগত সীমা নয়। সূচকটি AQI, শ্বাসের মাধ্যমে গৃহীত মাত্রা, রোগের ঝুঁকির শতাংশ বা নিরাপত্তার নিশ্চয়তা নয়।",
@@ -234,6 +234,7 @@ export function TravelPlanner() {
       {report && <>
         <p>{t[report.forecastSource]}</p>
         <p>{t.fetched}: <time dateTime={report.fetchedAt}>{formatTime(Date.parse(report.fetchedAt))}</time></p>
+        {report.forecastIssuedAt && <p>{t.issued}: <time dateTime={report.forecastIssuedAt}>{formatTime(Date.parse(report.forecastIssuedAt))}</time></p>}
         {forecastTimes.length > 0 && <p>{t.coverage}: {formatTime(forecastTimes[0])} → {formatTime(forecastTimes[forecastTimes.length - 1])}</p>}
       </>}
       <p>{t.run}</p><p>{t.method}</p><p>{t.limits}</p><p>{t.provisional}</p><p>{t.privacy}</p>

@@ -12,7 +12,7 @@ export type HypotheticalScenario = SimulatorScenario & { pm25: number };
 export type ForecastScenario = SimulatorScenario & { departureMs: number };
 export type SimulatorLocation = { lat: number; lon: number };
 export type SimulatorCurrent = SimulatorLocation & {
-  now: { pm25: number; time: string; kind: "model_estimate"; source: ForecastSource };
+  now: { pm25: number; time: string; kind: "model_estimate"; source: ForecastSource; issuedAt?: string };
   fetchedAt: string;
   receivedAtMs: number;
 };
@@ -82,11 +82,13 @@ export function readSimulatorCurrent(value: unknown, location: SimulatorLocation
       !freshFetch(data.fetchedAt, receivedAtMs)) throw new Error("Invalid current provenance or location");
   const current = data.now as Record<string, unknown>;
   if (current.kind !== "model_estimate" || (current.source !== "cams" && current.source !== "nirmol") ||
+      (current.issuedAt !== undefined && (current.source !== "nirmol" || typeof current.issuedAt !== "string" || !freshFetch(current.issuedAt, receivedAtMs))) ||
       !isValidConcentration(current.pm25) || !Number.isFinite(absoluteTime(current.time)) ||
       !isUsableCurrentEstimate(current.time as string, receivedAtMs)) throw new Error("Invalid or unavailable current estimate");
   return {
     lat: data.lat, lon: data.lon, fetchedAt: data.fetchedAt, receivedAtMs,
-    now: { pm25: current.pm25, time: current.time as string, kind: "model_estimate", source: current.source },
+    now: { pm25: current.pm25, time: current.time as string, kind: "model_estimate", source: current.source,
+      ...(typeof current.issuedAt === "string" ? { issuedAt: current.issuedAt } : {}) },
   };
 }
 
@@ -97,6 +99,7 @@ export function compareCurrent(
   // Validate at original receipt AND now. A future reading cannot age into use.
   const data = readSimulatorCurrent(report, location, report.receivedAtMs);
   if (!Number.isFinite(nowMs) || nowMs < data.receivedAtMs || !freshFetch(data.fetchedAt, nowMs) ||
+      (data.now.issuedAt !== undefined && !freshFetch(data.now.issuedAt, nowMs)) ||
       !isUsableCurrentEstimate(data.now.time, nowMs)) throw new Error("Current estimate expired");
   return compareHypothetical(person, { ...baseline, pm25: data.now.pm25 }, { ...alternative, pm25: data.now.pm25 });
 }
