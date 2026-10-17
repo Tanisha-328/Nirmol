@@ -48,7 +48,7 @@ export function readTravelAir(value: unknown, location: { lat: number; lon: numb
   const data = value as Record<string, unknown>;
   if (typeof data.lat !== "number" || typeof data.lon !== "number" ||
       !Number.isFinite(data.lat) || !Number.isFinite(data.lon) ||
-      Math.abs(data.lat - location.lat) > 0.0001 || Math.abs(data.lon - location.lon) > 0.0001 ||
+      data.lat !== location.lat || data.lon !== location.lon ||
       (data.forecastSource !== "cams" && data.forecastSource !== "nirmol") ||
       typeof data.fetchedAt !== "string" || !Array.isArray(data.forecast) || data.forecast.length > 25 ||
       (data.forecastIssuedAt !== undefined && typeof data.forecastIssuedAt !== "string")) {

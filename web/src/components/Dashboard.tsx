@@ -7,12 +7,23 @@ import { forecastWindow, isCompleteForecast, isFreshModelIssue, readAirReport, r
 import { LEVEL_COLORS, pm25ToAqi } from "@/lib/aqi";
 import { useI18n } from "@/lib/i18n";
 import { DEFAULT_DASHBOARD_LOCATION, restoreDashboardLocation, type DashboardLocation } from "@/lib/dashboard-location";
-import { PLACES, inBangladesh, nearestPlace } from "@/lib/places";
+import { PLACES, nearestPlace } from "@/lib/places";
+import { readGpsPosition } from "@/lib/location";
 import { ForecastChart } from "./ForecastChart";
 
 type Loc = DashboardLocation;
 type LoadState = { location: Loc; revision: number; report: AirReport | null; status: "loading" | "ready" | "error" };
 const DEFAULT = DEFAULT_DASHBOARD_LOCATION;
+const LOCATION_WORDS = {
+  en: { search: "Search listed Bangladesh cities", searchHelp: "Search the listed cities in Bangla or English. Neighborhood geocoding is not available. The city selector works offline; air data still needs a connection.", empty: "No listed city matches. Choose a city below or use My location.",
+    denied: "Location permission was denied. Choose a city or change your browser permission and retry.", unavailable: "GPS is unavailable. Choose a city or retry outdoors.", timeout: "Location request timed out. Retry or choose a city.", outside: "This coordinate is outside supported Bangladesh coverage. Choose a Bangladesh city. Border and island coverage can be incomplete.", invalid: "GPS returned invalid coordinates or accuracy. Retry or choose a city.", expired: "The GPS reading is too old. Retry to request a new reading.", poor: "GPS accuracy is worse than 1,000 metres. Try again outdoors or choose a city.", locating: "Requesting location… You can choose a city while waiting.",
+    privacy: "My location sends selected coordinates to Nirmol and its environmental providers. The selection is saved only in this browser, with no account synchronization. GPS runs only when you press the button.",
+    accuracy: "Browser-reported GPS accuracy radius", unknown: "GPS accuracy is unavailable.", captured: "GPS captured", saved: "Saved coordinates; confirm or request a new GPS reading before reuse.", city: "Selected city reference point; not your device location.", source: "Regional CAMS model estimates are not station or street-level measurements. Nearby places may share a model grid and the same values. No live station or low-cost sensor is connected here. Nirmol's custom forecast is eligible only at its evaluated Baridhara reference site.", grid: "CAMS provider-returned grid centre", selected: "Selection time" },
+  bn: { search: "তালিকার বাংলাদেশি শহর খুঁজুন", searchHelp: "বাংলা বা ইংরেজিতে তালিকার শহর খুঁজুন। মহল্লাভিত্তিক জিওকোডিং নেই। শহর বাছাই অফলাইনেও চলে; বায়ুর তথ্য আনতে সংযোগ লাগে।", empty: "তালিকায় এই শহর নেই। নিচের শহর বাছুন বা আমার অবস্থান ব্যবহার করুন।",
+    denied: "অবস্থানের অনুমতি দেওয়া হয়নি। শহর বাছুন অথবা ব্রাউজারের অনুমতি বদলে আবার চেষ্টা করুন।", unavailable: "GPS পাওয়া যাচ্ছে না। শহর বাছুন বা বাইরে গিয়ে আবার চেষ্টা করুন।", timeout: "অবস্থান পেতে সময়সীমা শেষ। আবার চেষ্টা করুন বা শহর বাছুন।", outside: "স্থানটি বাংলাদেশের সমর্থিত এলাকার বাইরে। বাংলাদেশের শহর বাছুন। সীমান্ত ও দ্বীপের সীমানা অসম্পূর্ণ হতে পারে।", invalid: "GPS স্থানাঙ্ক বা নির্ভুলতার তথ্য অবৈধ। আবার চেষ্টা করুন বা শহর বাছুন।", expired: "GPS তথ্য পুরোনো। নতুন অবস্থান জানতে আবার চেষ্টা করুন।", poor: "GPS নির্ভুলতার ব্যাসার্ধ ১,০০০ মিটারের বেশি। বাইরে গিয়ে চেষ্টা করুন বা শহর বাছুন।", locating: "অবস্থান চাওয়া হচ্ছে… অপেক্ষার সময় শহর বাছতে পারেন।",
+    privacy: "আমার অবস্থান চাপলে বাছা স্থানাঙ্ক নির্মল ও পরিবেশগত তথ্যদাতার কাছে যায়। স্থান শুধু এই ব্রাউজারে থাকে; অ্যাকাউন্টে সিঙ্ক হয় না। বোতাম চাপলেই শুধু GPS চলে।",
+    accuracy: "ব্রাউজারের দেওয়া GPS নির্ভুলতার ব্যাসার্ধ", unknown: "GPS নির্ভুলতার তথ্য নেই।", captured: "GPS তথ্যের সময়", saved: "সংরক্ষিত স্থানাঙ্ক; ব্যবহারের আগে নিশ্চিত করুন বা নতুন GPS তথ্য নিন।", city: "বাছা শহরের রেফারেন্স স্থান; ডিভাইসের অবস্থান নয়।", source: "আঞ্চলিক CAMS মডেলের প্রাক্কলন স্টেশন বা রাস্তার পরিমাপ নয়। কাছাকাছি স্থান একই মডেল গ্রিড ও একই মান পেতে পারে। এখানে সরাসরি স্টেশন বা স্বল্পমূল্যের সেন্সর যুক্ত নেই। নির্মলের নিজস্ব পূর্বাভাস শুধু মূল্যায়িত বারিধারা রেফারেন্স স্থানে প্রযোজ্য।", grid: "CAMS তথ্যদাতার দেওয়া গ্রিডের কেন্দ্র", selected: "বাছাইয়ের সময়" },
+};
 const WORDS = {
   en: { complete: "24-hour forecast window", partial: "Partial forecast coverage", coverage: "Coverage window",
     issued: "Model issued", retrieved: "API retrieved", reading: "Reading valid time", unknown: "Source issuance time is not supplied; retrieval is not model generation.",
@@ -46,14 +57,18 @@ export function Dashboard() {
   const [restored, setRestored] = useState(false);
   const [revision, setRevision] = useState(0);
   const [loaded, setLoaded] = useState<LoadState>({ location: DEFAULT, revision: 0, report: null, status: "loading" });
-  const [locMsg, setLocMsg] = useState<string | null>(null);
+  const [locMsg, setLocMsg] = useState<"denied" | "unavailable" | "timeout" | "outside" | "invalid" | "expired" | "poor" | "locating" | null>(null);
+  const [search, setSearch] = useState("");
+  const geoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const geoRequest = useRef(0);
   const words = WORDS[lang];
+  const locationWords = LOCATION_WORDS[lang];
+  const matches = PLACES.filter((p) => `${p.name.en} ${p.name.bn}`.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
 
   useEffect(() => {
     setLoc(restoreDashboardLocation(() => localStorage.getItem("nirmol.loc")));
     setRestored(true);
-    return () => { geoRequest.current += 1; };
+    return () => { geoRequest.current += 1; if (geoTimer.current) clearTimeout(geoTimer.current); };
   }, []);
 
   useEffect(() => {
@@ -90,7 +105,9 @@ export function Dashboard() {
   const chooseLoc = (next: Loc) => {
     // A newer selection owns the location even if an earlier GPS call finishes.
     geoRequest.current += 1;
+    if (geoTimer.current) clearTimeout(geoTimer.current);
     setLocMsg(null);
+    setSearch("");
     setLoc(next);
     try {
       localStorage.setItem("nirmol.loc", JSON.stringify(next));
@@ -99,19 +116,34 @@ export function Dashboard() {
 
   const useMyLocation = () => {
     const request = ++geoRequest.current;
-    if (!navigator.geolocation) return setLocMsg(t.locationDenied);
-    setLocMsg(t.locating);
-    navigator.geolocation.getCurrentPosition(
+    if (geoTimer.current) clearTimeout(geoTimer.current);
+    if (!navigator.geolocation) return setLocMsg("unavailable");
+    setLocMsg("locating");
+    // Browsers cannot cancel getCurrentPosition. Invalidate callbacks on timeout,
+    // repeated attempts, manual selection and unmount, including broken transports.
+    geoTimer.current = setTimeout(() => {
+      if (request === geoRequest.current) { geoRequest.current += 1; setLocMsg("timeout"); }
+    }, 11000);
+    try { navigator.geolocation.getCurrentPosition(
       (pos) => {
         if (request !== geoRequest.current) return;
-        const { latitude: lat, longitude: lon } = pos.coords;
-        if (!inBangladesh(lat, lon)) return setLocMsg(t.locationDenied);
-        chooseLoc({ lat, lon, placeId: null });
+        if (geoTimer.current) clearTimeout(geoTimer.current);
+        geoRequest.current += 1;
+        const result = readGpsPosition(pos, Date.now());
+        if (!result.ok) return setLocMsg(result.reason);
+        chooseLoc({ lat: result.lat, lon: result.lon, placeId: null, evidence: result.evidence });
       },
-      () => { if (request === geoRequest.current) setLocMsg(t.locationDenied); },
-      { timeout: 10000, maximumAge: 600000 },
-    );
+      (error) => { if (request === geoRequest.current) {
+        geoRequest.current += 1;
+        if (geoTimer.current) clearTimeout(geoTimer.current);
+        setLocMsg(error.code === 1 ? "denied" : error.code === 3 ? "timeout" : "unavailable");
+      } },
+      { timeout: 10000, maximumAge: 0, enableHighAccuracy: true },
+    ); } catch { if (geoTimer.current) clearTimeout(geoTimer.current); geoRequest.current += 1; setLocMsg("unavailable"); }
   };
+
+  const chooseCity = (p: typeof PLACES[number]) => chooseLoc({ lat: p.lat, lon: p.lon, placeId: p.id,
+    evidence: { source: "manual-city", selectedAt: new Date().toISOString(), coverage: "BD-ADM0-71232402" } });
 
   const placeName = loc.placeId
     ? (PLACES.find((p) => p.id === loc.placeId) ?? PLACES[0]).name[lang]
@@ -139,12 +171,17 @@ export function Dashboard() {
         <span className="py-2.5 text-[var(--muted)]">{lang === "bn" ? "সব পাবলিক টুল উন্মুক্ত" : "Public tools stay open"}</span>
       </nav>
 
-      <section className="flex flex-wrap items-center gap-2">
+      <section aria-label={lang === "bn" ? "অবস্থান বাছাই" : "Location selection"} className="flex flex-wrap items-center gap-2">
+        <label className="w-full text-sm font-medium" htmlFor="location-search">{locationWords.search}</label>
+        <input id="location-search" type="search" value={search} maxLength={80} onChange={(e) => setSearch(e.target.value)} aria-describedby="location-search-help"
+          className="min-h-11 w-full rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 text-base" />
+        <p id="location-search-help" className="w-full text-xs text-[var(--muted)]">{locationWords.searchHelp}</p>
+        {search.trim() && <div className="w-full" aria-live="polite">{matches.length ? <ul className="grid gap-1 sm:grid-cols-2">{matches.map((p) => <li key={p.id}><button type="button" className="min-h-11 w-full rounded-xl border border-[var(--border)] px-3 py-2 text-left text-sm" onClick={() => chooseCity(p)}>{p.name[lang]}</button></li>)}</ul> : <p className="text-sm">{locationWords.empty}</p>}</div>}
         <select
           value={loc.placeId ?? ""}
           onChange={(e) => {
             const p = PLACES.find((x) => x.id === e.target.value);
-            if (p) chooseLoc({ lat: p.lat, lon: p.lon, placeId: p.id });
+            if (p) chooseCity(p);
           }}
           className="min-h-11 min-w-0 flex-1 rounded-xl border border-[var(--border)] bg-[var(--card)] px-3 text-base"
           aria-label={words.place}
@@ -159,7 +196,12 @@ export function Dashboard() {
         <button onClick={useMyLocation} className="dashboard-primary min-h-11 rounded-xl px-4 text-sm font-semibold">
           📍 {t.useMyLocation}
         </button>
-        {locMsg && <p role="status" className="w-full text-sm text-[var(--muted)]">{locMsg}</p>}
+        {locMsg && <p role="status" className="w-full text-sm text-[var(--muted)]">{locationWords[locMsg]}</p>}
+        <p className="w-full text-xs text-[var(--muted)]">{locationWords.privacy}</p>
+        <p className="w-full break-words text-xs text-[var(--muted)]">{loc.placeId ? locationWords.city : locationWords.saved}
+          {loc.evidence && <> {locationWords.selected}: <time dateTime={loc.evidence.selectedAt}>{new Date(loc.evidence.selectedAt).toLocaleString(lang === "bn" ? "bn-BD" : "en-GB", { timeZone: "Asia/Dhaka" })}</time>.</>}
+          {loc.evidence?.source === "gps" && <> {typeof loc.evidence.accuracyM !== "number" ? locationWords.unknown : `${locationWords.accuracy}: ${num(loc.evidence.accuracyM)} m.`} {locationWords.captured}: <time dateTime={loc.evidence.capturedAt}>{new Date(loc.evidence.capturedAt!).toLocaleString(lang === "bn" ? "bn-BD" : "en-GB", { timeZone: "Asia/Dhaka" })}</time>.</>}
+        </p>
       </section>
 
       {status === "error" && (
@@ -222,6 +264,10 @@ function Report({ report, placeName, onRefresh }: { report: AirReport; placeName
 
     return (
       <>
+        <aside className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-3 text-xs leading-relaxed text-[var(--muted)]">
+          {LOCATION_WORDS[lang].source}
+          {report.camsGrid && <p className="mt-2">{LOCATION_WORDS[lang].grid}: {num(report.camsGrid.lat)}, {num(report.camsGrid.lon)}</p>}
+        </aside>
         <section className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">

@@ -8,7 +8,12 @@ async function moduleUrl(path, replacements = {}) {
   let source = await readFile(new URL(path, import.meta.url), "utf8");
   for (const [from, to] of Object.entries(replacements)) source = source.replaceAll(`"${from}"`, `"${to}"`);
   const { outputText } = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2020 } });
-  return `data:text/javascript;base64,${Buffer.from(outputText).toString("base64")}`;
+  let code = outputText;
+  for (const match of [...code.matchAll(/from ["'](\.[^"']+)["']/g)]) {
+    const dependency = new URL(`${match[1]}.ts`, new URL(path, import.meta.url));
+    code = code.replace(match[0], `from ${JSON.stringify(await moduleUrl(dependency))}`);
+  }
+  return `data:text/javascript;base64,${Buffer.from(code).toString("base64")}`;
 }
 const exposureUrl = await moduleUrl("../src/lib/exposure.ts");
 const placesUrl = await moduleUrl("../src/lib/places.ts");

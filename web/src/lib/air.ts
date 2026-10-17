@@ -1,7 +1,7 @@
 // Server-side air-quality data layer. Every value carries its source so the UI can
 // label it Measured / Model estimate / Demo. Missing values are null, never 0.
 
-import { inDhakaModelArea } from "./places";
+import { inBangladesh, inDhakaModelArea, validCoordinates } from "./places";
 import type { ForecastExplanation } from "./forecast-explanation";
 import { absoluteTime, forecastWindow, hasForecastInterval, isCompleteForecast, isFreshModelIssue,
   object, openMeteoTime, readCurrent, readForecast, readNirmolPublication, readWeather } from "./air-validation";
@@ -27,6 +27,8 @@ export type AirReport = {
   forecastIssuedAt?: string;
   inDhakaModelArea: boolean;
   fetchedAt: string;
+  /** Provider-returned CAMS grid centre, never a station or a resolution claim. */
+  camsGrid?: { lat: number; lon: number };
 };
 
 const REVALIDATE_SECONDS = 900;
@@ -79,6 +81,8 @@ function readOpenMeteoAir(value: unknown, nowMs: number) {
   units(data.hourly_units, { time: "iso8601", pm2_5: "µg/m³" });
   const readings = hourly.pm2_5;
   return {
+    ...(typeof data.latitude === "number" && typeof data.longitude === "number" && validCoordinates(data.latitude, data.longitude)
+      ? { grid: { lat: data.latitude, lon: data.longitude } } : {}),
     now: readCurrent({ time: openMeteoTime(current.time), pm25: current.pm2_5, kind: "model_estimate", source: "cams" }, nowMs),
     forecast: readForecast(hourly.time.map((time, i) => ({ time: openMeteoTime(time), pm25: readings[i] }))),
   };
@@ -128,8 +132,9 @@ async function latestNirmolForecast(signal?: AbortSignal): Promise<{ points: For
 }
 
 export async function getAirReport(lat: number, lon: number, signal?: AbortSignal): Promise<AirReport> {
+  if (!inBangladesh(lat, lon)) throw new Error("Unsupported location");
   if (signal?.aborted) throw new Error("Air request cancelled");
-  const q = `latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&timezone=GMT`;
+  const q = `latitude=${lat}&longitude=${lon}&timezone=GMT`;
   const dhaka = inDhakaModelArea(lat, lon);
   const [air, weather, model] = await Promise.all([
     getJson(`https://air-quality-api.open-meteo.com/v1/air-quality?${q}&current=pm2_5&hourly=pm2_5&forecast_days=2`, signal)
@@ -172,5 +177,6 @@ export async function getAirReport(lat: number, lon: number, signal?: AbortSigna
     ...(useNirmol && nirmol ? { forecastIssuedAt: nirmol.issuedAt } : {}),
     inDhakaModelArea: dhaka,
     fetchedAt: new Date().toISOString(),
+    ...(air?.grid ? { camsGrid: air.grid } : {}),
   };
 }

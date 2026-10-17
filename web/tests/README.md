@@ -1,3 +1,24 @@
+# Phase 1 location reliability
+
+Run `node --test tests/location.test.mjs tests/air.test.mjs` and the full existing
+unit/browser suites below. The new coverage uses the pinned country polygon,
+controlled GPS positions and controlled environmental responses. No live-provider
+availability, legal border accuracy or device GPS precision is certified.
+
+Manual search deliberately filters the existing city/reference registry in English
+or Bangla, without network geocoding. Tests cover offline/empty search, permission
+denial, unavailable GPS, poor accuracy, age, timeout, repeated and obsolete callbacks,
+exact coordinates, source grid metadata and cross-tool restoration. Custom-model
+fixtures now select `dhaka-reference` (23.796374, 90.424614); city-wide or nationwide
+validation is not implied. Explicit null place IDs remain custom coordinates;
+unknown or mismatched registered IDs are invalid in every restoring tool.
+
+The manually substituted unit loaders resolve the new polygon dependency recursively.
+Browser checks use Edge with a temporary Playwright installation, without adding it
+to the app manifest/lockfile. On Windows a sandbox renderer crash can prevent page
+creation; record that failed attempt and rerun with the required browser permission.
+Always stop/restart the owned server after rebuilding so it serves the matching build.
+
 # Auth and My Nirmol
 
 Use Node 22+ and the committed npm lockfile. From `web`, run all unit suites with

@@ -7,7 +7,7 @@ export type Lang = "bn" | "en";
 
 const STRINGS = {
   bn: {
-    tagline: "বাতাস জানুন, নিরাপদ থাকুন",
+    tagline: "নির্মল বাতাস, উজ্জ্বল জীবন।",
     useMyLocation: "আমার অবস্থান",
     locating: "অবস্থান খোঁজা হচ্ছে…",
     locationDenied: "অবস্থান পাওয়া যায়নি, তালিকা থেকে বেছে নিন।",
@@ -32,7 +32,7 @@ const STRINGS = {
     sourceNirmol: "মডেল প্রাক্কলন — নির্মল (CAMS সংশোধিত)",
     sourceCams: "মডেল প্রাক্কলন — CAMS (Copernicus)",
     camsWarning:
-      "বৈশ্বিক মডেল বাংলাদেশে শীতকালীন দূষণ প্রায়ই কম দেখায়। ঢাকায় ২০২২–২৫ সালের শীতে প্রকৃত গড় ছিল CAMS-এর প্রায় দ্বিগুণ। প্রকৃত মাত্রা বেশি হতে পারে।",
+      "ঢাকার রেফারেন্স পর্যবেক্ষণ স্থানে ২০২২–২৫ সালের শীতে পরিমাপের গড় ছিল CAMS-এর প্রায় দ্বিগুণ। এই ঐতিহাসিক তুলনা অন্য স্থানের ত্রুটি নির্ধারণ করে না। স্থানীয় বর্তমান মাত্রা আলাদা হতে পারে।",
     whatIsThis: "এই তথ্য কোথা থেকে?",
     sourceExplain:
       "এটি সরাসরি পরিমাপ নয়, মডেলের হিসাব। নির্মলের মডেল অতীতের তথ্য দিয়ে CAMS সংশোধন করে এবং ঢাকার মার্কিন দূতাবাসের পর্যবেক্ষণ স্থানে মূল্যায়িত হয়েছে। এতে রাস্তাভিত্তিক নির্ভুলতা বা সমগ্র বাংলাদেশের জন্য যাচাই প্রতিষ্ঠিত হয় না।",
@@ -58,7 +58,7 @@ const STRINGS = {
     } satisfies Record<AqiLevel, string>,
   },
   en: {
-    tagline: "Know your air, stay safe",
+    tagline: "Cleaner air, brighter lives.",
     useMyLocation: "My location",
     locating: "Finding your location…",
     locationDenied: "Couldn't get your location. Pick a place from the list.",
@@ -83,7 +83,7 @@ const STRINGS = {
     sourceNirmol: "Model estimate — Nirmol (CAMS corrected)",
     sourceCams: "Model estimate — CAMS (Copernicus)",
     camsWarning:
-      "Global models often underestimate winter pollution in Bangladesh. In Dhaka's 2022–25 winters, measured levels averaged about twice CAMS. Actual levels may be higher.",
+      "At the Dhaka reference site in the 2022–25 winters, measured levels averaged about twice CAMS. This historical comparison does not establish model bias at other locations. Current local levels may differ.",
     whatIsThis: "Where does this come from?",
     sourceExplain:
       "This is a model estimate, not a direct measurement. Nirmol corrects CAMS using historical data and was evaluated at the US Embassy monitoring site in Dhaka. That does not establish street-level accuracy or validation throughout Bangladesh.",

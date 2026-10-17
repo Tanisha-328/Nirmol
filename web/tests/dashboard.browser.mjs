@@ -40,6 +40,7 @@ beforeEach(async () => {
 afterEach(async () => { await context?.close(); assert.deepEqual(errors, [], "no runtime or hydration errors"); });
 async function started(count) { await page.waitForFunction((n) => window.airRequests.length >= n, count); }
 async function open() { await page.goto(baseURL); await started(1); }
+async function reference() { await context.addInitScript(() => localStorage.setItem("nirmol.loc", JSON.stringify({ lat: 23.796374, lon: 90.424614, placeId: "dhaka-reference" }))); }
 function fixture(url, overrides = {}) {
   const q = new URL(url).searchParams;
   return {
@@ -204,6 +205,7 @@ test("A04 fast switching after a restored location preserves A01 request ownersh
 });
 
 test("A09 genuine SHAP follows the selected hour and keyboard selection without another request", async () => {
+  await reference();
   const data = explainedReport();
   await open(); await finish(0, data); await pm("20");
   assert.equal(await explanation().locator("li").count(), 3);
@@ -235,6 +237,7 @@ test("A09 genuine SHAP follows the selected hour and keyboard selection without 
 });
 
 test("A09 hour selection survives source details and language changes with translated factors", async () => {
+  await reference();
   const data = explainedReport();
   await open(); await finish(0, data); await pm("20");
   await forecastHour().selectOption(data.forecast[1].time);
@@ -249,6 +252,7 @@ test("A09 hour selection survives source details and language changes with trans
 });
 
 test("RC keyboard-selected hours expose their numeric quantile range outside the hidden chart", async () => {
+  await reference();
   const data = explainedReport();
   data.forecast.forEach((point, index) => { point.low = 25 + index; point.high = 45 + index; });
   await open(); await finish(0, data); await pm("20");
@@ -314,6 +318,7 @@ test("RC optional weather expires on an open dashboard independently of fetchedA
 });
 
 test("A09 CAMS and legacy forecast points do not invent SHAP", async () => {
+  await reference();
   await open(); await finish(0); await pm("20");
   assert.match(await explanation().innerText(), /SHAP explanation unavailable for this hour/);
   assert.equal(await explanation().locator("li").count(), 0);
@@ -324,6 +329,7 @@ test("A09 CAMS and legacy forecast points do not invent SHAP", async () => {
 });
 
 test("A09 malformed or mismatched hour explanations are omitted while valid forecasts remain", async () => {
+  await reference();
   for (const mutate of [
     (point) => { point.explanation.factors[0].feature = "road_traffic"; },
     (point) => { point.explanation.factors[1].feature = point.explanation.factors[0].feature; },
@@ -348,6 +354,7 @@ test("A09 injected CAMS explanations are discarded rather than attributed to Nir
 });
 
 test("A09 mixed publication IDs cannot produce a stitched explanation", async () => {
+  await reference();
   const data = explainedReport(); data.forecast[1].explanation.runId = 402;
   await open(); await finish(0, data); await pm("20");
   assert.match(await explanation().innerText(), /SHAP explanation unavailable for this hour/);
@@ -356,6 +363,7 @@ test("A09 mixed publication IDs cannot produce a stitched explanation", async ()
 });
 
 test("A09 selecting a next-day hour retains its full Dhaka date and exact SHAP ownership", async () => {
+  await reference();
   const data = explainedReport();
   await open(); await finish(0, data); await pm("20");
   await forecastHour().selectOption(data.forecast[24].time);
@@ -368,6 +376,7 @@ test("A09 selecting a next-day hour retains its full Dhaka date and exact SHAP o
 });
 
 test("A09 missing concentration and empty forecasts have honest unavailable states", async () => {
+  await reference();
   const data = explainedReport(); data.forecast[0].pm25 = null;
   await open(); await finish(0, data); await pm("20");
   assert.match(await explanation().innerText(), /SHAP explanation unavailable for this hour|No data/);
@@ -379,6 +388,7 @@ test("A09 missing concentration and empty forecasts have honest unavailable stat
 });
 
 test("A09 expired issuance and changing locations immediately remove old SHAP", async () => {
+  await reference();
   const data = explainedReport(); data.forecastIssuedAt = new Date(now - 3 * 3_600_000 + 60_000).toISOString();
   data.forecast = explainedForecast(data.forecastIssuedAt);
   await open(); await finish(0, data); await pm("20"); assert.equal(await explanation().locator("li").count(), 3);
@@ -392,6 +402,7 @@ test("A09 expired issuance and changing locations immediately remove old SHAP", 
 });
 
 test("A09 a late explained response cannot overwrite a different location's CAMS report", async () => {
+  await reference();
   await open(); await placeSelect().selectOption("chattogram"); await started(2);
   await finish(1); await pm("20"); await finish(0, explainedReport());
   assert.match(await currentCard().innerText(), /Chattogram/);
@@ -413,6 +424,7 @@ test("A11 category and provenance badges and location text meet contrast in both
 });
 
 test("A11 SHAP, action links and keyboard focus work at 320px, tablet and desktop in both languages and themes", async () => {
+  await reference();
   await open(); await finish(0, explainedReport()); await pm("20");
   for (const lang of ["en", "bn"]) {
     if (lang === "bn") await page.getByRole("button", { name: "Switch language: বাংলা", exact: true }).click();
@@ -435,6 +447,7 @@ test("A11 SHAP, action links and keyboard focus work at 320px, tablet and deskto
 });
 
 test("A06 recovered older publication retains its original issuance and honest partial horizon", async () => {
+  await reference();
   await open();
   const issuedAt = new Date(now - 2 * 3_600_000).toISOString();
   await finish(0, {
@@ -532,12 +545,14 @@ test("A03 future, stale, impossible and ambiguous current times never display ne
   }
 });
 test("A03 current fallback and custom forecast have independent, accurate source labels", async () => {
+  await reference();
   await open(); await finish(0, { forecastSource: "nirmol" }); await pm("20");
   assert.match(await currentCard().innerText(), /Model estimate — CAMS/);
   assert.doesNotMatch(await currentCard().innerText(), /Model estimate — Nirmol/);
   assert.match(await forecastCard().innerText(), /Model estimate — Nirmol/);
 });
 test("A03 no valid current source leaves its timestamp unavailable while a future forecast remains visible", async () => {
+  await reference();
   await open(); const data = fixture(baseURL);
   await finish(0, { now: { ...data.now, pm25: null, time: "" }, forecastSource: "nirmol", forecast: data.forecast.slice(1) });
   await pm("No data"); assert.doesNotMatch(await currentCard().innerText(), /Updated|AQI/);
@@ -613,6 +628,7 @@ test("A07 reading age advances on an open page without new requests", async () =
   assert.equal(await page.evaluate(() => document.activeElement.textContent), "Refresh data");
 });
 test("A07 cached model issuance expires on an open page despite a fresh fetchedAt", async () => {
+  await reference();
   await open(); const data = fixture(baseURL); const issuedAt = new Date(now - 3 * 3_600_000 + 60_000).toISOString();
   await finish(0, { now: { ...data.now, source: "nirmol", issuedAt }, forecastSource: "nirmol", forecastIssuedAt: issuedAt });
   await pm("20");
@@ -623,6 +639,7 @@ test("A07 cached model issuance expires on an open page despite a fresh fetchedA
   assert.equal(await page.locator(`time[datetime="${new Date(now).toISOString()}"]`).count() > 0, true);
 });
 test("A07 issuance, valid-time coverage and retrieval are distinct and shown in both languages", async () => {
+  await reference();
   await open(); const data = fixture(baseURL); const issuedAt = new Date(now - 3_600_000).toISOString();
   await finish(0, { now: { ...data.now, source: "nirmol", issuedAt }, forecastSource: "nirmol", forecastIssuedAt: issuedAt }); await pm("20");
   const text = await page.locator("main").innerText();
@@ -645,6 +662,7 @@ test("A07 Feature 03 drops current estimates when their model issuance expires",
   assert.equal(await page.evaluate(() => window.airRequests.length), 1);
 });
 test("A07 Feature 04 expires model forecasts independently of the recent API retrieval", async () => {
+  await reference();
   await page.goto(`${baseURL}/travel`); await started(1);
   const issuedAt = new Date(now - 3 * 3_600_000 + 60_000).toISOString();
   await finish(0, { forecastSource: "nirmol", forecastIssuedAt: issuedAt });
@@ -656,6 +674,7 @@ test("A07 Feature 04 expires model forecasts independently of the recent API ret
   assert.equal(await page.getByTestId("recommendation").count(), 0);
 });
 test("A07 Feature 14 cannot refresh expired current or forecast issuance with a new fetchedAt", async () => {
+  await reference();
   await page.goto(`${baseURL}/simulator`); await page.getByRole("button", { name: "Current estimate", exact: true }).click(); await started(1);
   const issuedAt = new Date(now - 3 * 3_600_000 + 60_000).toISOString();
   await finish(0, { now: { ...fixture(baseURL).now, source: "nirmol", issuedAt } });
@@ -693,3 +712,104 @@ test("A08 a hung dashboard request becomes retryable and its late success remain
   await finish(0, { now: { ...fixture(baseURL).now, pm25: 5 } });
   assert.match(await page.locator(".text-5xl").innerText(), /^20/);
 });
+
+// Phase 1 GPS and offline manual-search regressions.
+async function mockGps() {
+  await context.addInitScript(() => {
+    window.geoCallbacks = [];
+    Object.defineProperty(navigator, "geolocation", { configurable: true, value: {
+      getCurrentPosition: (success, failure, options) => window.geoCallbacks.push({ success, failure, options }),
+    } });
+  });
+}
+async function gpsReply(index, overrides = {}) {
+  await page.evaluate(({ index, overrides, now }) => window.geoCallbacks[index].success({ timestamp: now,
+    coords: { latitude: 23.815923456, longitude: 90.371084567, accuracy: 42.625 }, ...overrides }), { index, overrides, now });
+  await settle();
+}
+test("location: GPS waits for action, retains real accuracy and exact coordinates, and repeated attempts ignore old callbacks", async () => {
+  await mockGps(); await open(); await finish(0); await pm("20");
+  assert.equal(await page.evaluate(() => window.geoCallbacks.length), 0);
+  const button = page.getByRole("button", { name: /My location/ });
+  await button.click(); await button.click();
+  assert.equal(await page.evaluate(() => window.geoCallbacks.length), 2);
+  assert.equal(await page.evaluate(() => window.geoCallbacks[1].options.maximumAge), 0);
+  await gpsReply(0);
+  assert.equal(await page.evaluate(() => window.airRequests.length), 1);
+  await gpsReply(1); await started(2);
+  const q = new URL(await page.evaluate(() => window.airRequests[1].url)).searchParams;
+  assert.equal(q.get("lat"), "23.815923456"); assert.equal(q.get("lon"), "90.371084567");
+  await finish(1); await pm("20");
+  assert.match(await page.locator("main").innerText(), /42.625 m/);
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("nirmol.loc")));
+  assert.equal(saved.evidence.accuracyM, 42.625); assert.equal(saved.evidence.source, "gps");
+  assert.equal(saved.evidence.capturedAt, new Date(now).toISOString());
+});
+for (const [code, message] of [[1, /permission was denied/], [2, /GPS is unavailable/], [3, /timed out/]]) {
+  test(`location: GPS error ${code} is actionable and does not replace the selection`, async () => {
+    await mockGps(); await open(); await finish(0); await pm("20");
+    await page.getByRole("button", { name: /My location/ }).click();
+    await page.evaluate((code) => window.geoCallbacks[0].failure({ code }), code); await settle();
+    assert.match(await page.getByRole("status").innerText(), message);
+    assert.equal(await placeSelect().inputValue(), "dhaka");
+    assert.equal(await page.evaluate(() => window.airRequests.length), 1);
+  });
+}
+for (const [label, overrides, message] of [
+  ["poor accuracy", { coords: { latitude: 23.8, longitude: 90.4, accuracy: 2000 } }, /worse than 1,000/],
+  ["foreign territory", { coords: { latitude: 23.8315, longitude: 91.2868, accuracy: 10 } }, /outside supported/],
+  ["expired", { timestamp: now - 120001 }, /too old/],
+]) test(`location: ${label} GPS is rejected with manual fallback intact`, async () => {
+  await mockGps(); await open(); await finish(0); await pm("20");
+  await page.getByRole("button", { name: /My location/ }).click(); await gpsReply(0, overrides);
+  assert.match(await page.getByRole("status").innerText(), message);
+  assert.equal(await placeSelect().inputValue(), "dhaka");
+  assert.equal(await page.evaluate(() => window.airRequests.length), 1);
+});
+test("location: stalled GPS times out and a late success cannot start an air request", async () => {
+  await mockGps(); await open(); await finish(0); await pm("20");
+  await page.getByRole("button", { name: /My location/ }).click();
+  await page.clock.fastForward(11001); await settle();
+  assert.match(await page.getByRole("status").innerText(), /timed out/);
+  await gpsReply(0); assert.equal(await page.evaluate(() => window.airRequests.length), 1);
+});
+test("location: unknown GPS accuracy stays unavailable rather than becoming zero", async () => {
+  await mockGps(); await open(); await finish(0);
+  await page.getByRole("button", { name: /My location/ }).click();
+  await gpsReply(0, { coords: { latitude: 23.8, longitude: 90.4 } }); await started(2); await finish(1);
+  assert.match(await page.locator("main").innerText(), /GPS accuracy is unavailable/);
+  assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem("nirmol.loc")).evidence.accuracyM), null);
+});
+test("location: bilingual offline city search, empty results and keyboard selection preserve exact registry coordinates", async () => {
+  await open(); await finish(0); await pm("20");
+  const search = page.getByRole("searchbox", { name: "Search listed Bangladesh cities" });
+  await context.setOffline(true);
+  await search.fill("not-a-listed-place"); assert.match(await page.locator("main").innerText(), /No listed city matches/);
+  assert.equal(await placeSelect().isEnabled(), true);
+  assert.equal(await page.evaluate(() => window.airRequests.length), 1);
+  await search.fill("খুলনা");
+  await page.getByRole("button", { name: "Khulna", exact: true }).focus(); await page.keyboard.press("Enter");
+  await started(2); await finish(1); await pm("20");
+  assert.equal(await placeSelect().inputValue(), "khulna");
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("nirmol.loc")));
+  assert.equal(saved.lat, 22.8456); assert.equal(saved.lon, 89.5403); assert.equal(saved.evidence.source, "manual-city");
+  await page.getByRole("button", { name: "Switch language: বাংলা", exact: true }).click();
+  assert.equal(await page.getByRole("searchbox", { name: "তালিকার বাংলাদেশি শহর খুঁজুন" }).count(), 1);
+  for (const width of [320, 375, 1280]) {
+    await page.setViewportSize({ width, height: 900 });
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+  }
+});
+for (const [path, modeButton] of [["/exposure", null], ["/travel", null], ["/simulator", "Current estimate"]]) {
+  test(`location: ${path} rejects mismatched saved ID/coordinates with the shared validator`, async () => {
+    const invalid = JSON.stringify({ lat: 23.7808, lon: 90.4067, placeId: "khulna" });
+    await context.addInitScript((invalid) => localStorage.setItem("nirmol.loc", invalid), invalid);
+    await page.goto(baseURL + path);
+    if (modeButton) await page.getByRole("button", { name: modeButton, exact: true }).click();
+    await started(1);
+    assert.equal(await page.evaluate(() => window.airRequests.length), 1, "one request after restoration");
+    const queries = await page.evaluate(() => window.airRequests.map((request) => new URL(request.url).searchParams.get("lat")));
+    assert.ok(queries.every((lat) => lat === "23.7808"));
+    assert.equal(await page.evaluate(() => localStorage.getItem("nirmol.loc")), invalid);
+  });
+}

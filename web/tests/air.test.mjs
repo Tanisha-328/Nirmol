@@ -38,7 +38,7 @@ const { createDiaryEntry, restoreDiaryEntry } = await import(await moduleURL(new
 
 const HOUR = 3_600_000;
 const START = Date.parse("2026-10-16T18:00:00Z"); // midnight in Bangladesh
-const LOCATION = { lat: 23.7808, lon: 90.4067 };
+const LOCATION = { lat: 23.796374, lon: 90.424614 };
 const OTHER = { lat: 22.3569, lon: 91.7832 };
 const originalDate = Date;
 const originalFetch = globalThis.fetch;
@@ -475,9 +475,9 @@ test("A07 issuance metadata persists in diary snapshots without expiring saved h
   custom(); runs[0].issued_at = iso(nowMs - 2 * HOUR);
   const raw = await report(LOCATION);
   const assessment = nowMs;
-  const current = createDiaryEntry({ activityStartedAt: iso(nowMs), placeId: "dhaka", activity: "walking", outdoorHours: 0.25,
+  const current = createDiaryEntry({ activityStartedAt: iso(nowMs), placeId: "dhaka-reference", activity: "walking", outdoorHours: 0.25,
     source: { kind: "current", report: readSimulatorCurrent(raw, LOCATION, nowMs) }, symptoms: [], notes: "" });
-  const forecast = createDiaryEntry({ activityStartedAt: iso(START + HOUR), placeId: "dhaka", activity: "walking", outdoorHours: 1,
+  const forecast = createDiaryEntry({ activityStartedAt: iso(START + HOUR), placeId: "dhaka-reference", activity: "walking", outdoorHours: 1,
     source: { kind: "forecast", report: raw }, symptoms: [], notes: "" });
   nowMs += 5 * HOUR;
   const savedCurrent = restoreDiaryEntry(current), savedForecast = restoreDiaryEntry(forecast);
@@ -868,7 +868,7 @@ test("A09 client omits explanations for CAMS, absent issuance, null readings, ex
     assert.ok(result.forecast.every((p) => p.explanation === undefined));
   }
   const outside = { ...raw, ...OTHER, forecast, inDhakaModelArea: true };
-  assert.ok(readAirReport(outside, OTHER, nowMs).forecast.every((p) => p.explanation === undefined));
+  assert.throws(() => readAirReport(outside, OTHER, nowMs), /outside evaluated reference/);
 });
 
 test("A09 source switching or wrong-location responses cannot retain old explanations", async () => {
@@ -877,4 +877,43 @@ test("A09 source switching or wrong-location responses cannot retain old explana
   assert.throws(() => readAirReport(first, OTHER, nowMs));
   const cams = { ...first, forecastSource: "cams", forecastIssuedAt: undefined };
   assert.ok(readAirReport(cams, LOCATION, nowMs).forecast.every((p) => p.explanation === undefined));
+});
+
+// Phase 1 location regressions: fixtures only, never live-provider verification.
+test("country polygon rejects foreign/missing/duplicate API coordinates before provider access", async () => {
+  let calls = 0; globalThis.fetch = async () => { calls++; throw Error("must not call provider"); };
+  for (const query of ["lat=23.8315&lon=91.2868", "lat=25.5788&lon=91.8933", "lat=20.5&lon=88", "lat=&lon=90", "lat=23.78", "lat=23.78&lat=24&lon=90.4"]) {
+    const response = await GET(new Request(`http://test.invalid/api/air?${query}`));
+    assert.equal(response.status, 400, query);
+    assert.equal(response.headers.get("Cache-Control"), "no-store");
+  }
+  assert.equal(calls, 0);
+});
+test("exact selected coordinates reach providers and returned CAMS grid metadata is retained", async () => {
+  const calls = []; const previous = globalThis.fetch;
+  air.latitude = 23.8; air.longitude = 90.4;
+  globalThis.fetch = async (url, options) => { calls.push(url); return previous(url, options); };
+  const selected = { lat: 23.815923456, lon: 90.371084567 };
+  const result = await report(selected);
+  assert.deepEqual({ lat: result.lat, lon: result.lon }, selected);
+  assert.deepEqual(result.camsGrid, { lat: 23.8, lon: 90.4 });
+  assert.deepEqual(readAirReport(result, selected, nowMs).camsGrid, result.camsGrid);
+  assert.ok(calls.every((url) => new URL(url).searchParams.get("latitude") === String(selected.lat)));
+  assert.ok(calls.every((url) => new URL(url).searchParams.get("longitude") === String(selected.lon)));
+  assert.equal(result.forecastSource, "cams");
+  assert.equal(calls.some((url) => url.includes("supabase") || url.includes("forecast_runs")), false);
+  assert.throws(() => readAirReport(result, { ...selected, lat: selected.lat + 0.000001 }, nowMs));
+});
+test("absent/invalid grid metadata stays absent and never implies a station location", async () => {
+  air.latitude = NaN; air.longitude = 90;
+  const result = await report(OTHER);
+  assert.equal(result.camsGrid, undefined);
+  assert.equal(readAirReport({ ...result, camsGrid: { lat: 900, lon: 90 } }, OTHER, nowMs).camsGrid, undefined);
+});
+test("custom forecasts are unavailable outside reference even when falsely marked eligible", async () => {
+  custom(); const result = await report(LOCATION);
+  const outside = { ...result, lat: 23.7808, lon: 90.4067, inDhakaModelArea: true };
+  assert.throws(() => readAirReport(outside, outside, nowMs), /outside evaluated reference/);
+  const cams = await report({ lat: 23.7808, lon: 90.4067 });
+  assert.equal(cams.forecastSource, "cams"); assert.equal(cams.inDhakaModelArea, false);
 });

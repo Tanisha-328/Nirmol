@@ -1,5 +1,7 @@
 "use client";
 
+import { restoreDashboardLocation } from "@/lib/dashboard-location";
+
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
@@ -7,7 +9,7 @@ import {
   type ActivityLevel, type AgeGroup, type Sensitivity,
 } from "@/lib/exposure";
 import { useI18n } from "@/lib/i18n";
-import { inBangladesh, nearestPlace, PLACES } from "@/lib/places";
+import { nearestPlace, PLACES } from "@/lib/places";
 import {
   dhakaInput, isFreshTravelReport, parseDhakaInput, planTravel, readTravelAir,
   type TravelAir, type TravelOption, type TravelPlan,
@@ -75,6 +77,7 @@ export function TravelPlanner() {
   const { lang, setLang, num } = useI18n();
   const t = WORDS[lang];
   const [location, setLocation] = useState<Location>(INITIAL_LOCATION);
+  const [restored, setRestored] = useState(false);
   const [profile, setProfile] = useState(() => ({
     ageGroup: DEFAULT_EXPOSURE_PROFILE.ageGroup, activity: DEFAULT_EXPOSURE_PROFILE.activity,
     sensitivities: [] as Sensitivity[],
@@ -99,17 +102,12 @@ export function TravelPlanner() {
   }, []);
 
   useEffect(() => {
-    try {
-      const saved: unknown = JSON.parse(localStorage.getItem("nirmol.loc") ?? "null");
-      if (!saved || typeof saved !== "object") return;
-      const p = saved as { lat?: unknown; lon?: unknown; placeId?: unknown };
-      if (typeof p.lat !== "number" || typeof p.lon !== "number" || !inBangladesh(p.lat, p.lon)) return;
-      const place = PLACES.find((v) => v.id === p.placeId);
-      setLocation(place ? { lat: place.lat, lon: place.lon, placeId: place.id } : { lat: p.lat, lon: p.lon, placeId: null });
-    } catch { /* Saved location is optional. */ }
+    setLocation(restoreDashboardLocation(() => localStorage.getItem("nirmol.loc")));
+    setRestored(true);
   }, []);
 
   useEffect(() => {
+    if (!restored) return;
     const controller = new AbortController();
     let active = true;
     const timeout = window.setTimeout(() => {
@@ -127,7 +125,7 @@ export function TravelPlanner() {
       .catch(() => { if (active) setAirState({ key, report: null, status: "error" }); })
       .finally(() => window.clearTimeout(timeout));
     return () => { active = false; controller.abort(); window.clearTimeout(timeout); };
-  }, [key, location]);
+  }, [key, location, restored]);
 
   const outdoorHours = duration.trim() ? Number(duration) : NaN;
   const earliest = parseDhakaInput(windowInput?.earliest ?? "");

@@ -247,7 +247,7 @@ test("malformed saved locations are ignored and custom Bangladesh locations are 
     await open(); await indicator("60.0");
     assert.equal(await page.getByLabel("Location", { exact: true }).inputValue(), "dhaka");
   }
-  await page.evaluate(() => sessionStorage.setItem("test.loc", JSON.stringify({ lat: 23.75, lon: 90.4, placeId: "unknown" })));
+  await page.evaluate(() => sessionStorage.setItem("test.loc", JSON.stringify({ lat: 23.75, lon: 90.4, placeId: null })));
   await open(); await indicator("60.0");
   assert.equal(await page.getByLabel("Location", { exact: true }).inputValue(), "saved");
   assert.match(await page.getByLabel("Location", { exact: true }).innerText(), /Saved location near/);

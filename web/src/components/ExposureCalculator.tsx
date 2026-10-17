@@ -1,5 +1,7 @@
 "use client";
 
+import { restoreDashboardLocation } from "@/lib/dashboard-location";
+
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { AirReport } from "@/lib/air";
@@ -18,7 +20,7 @@ import {
   type Sensitivity,
 } from "@/lib/exposure";
 import { useI18n } from "@/lib/i18n";
-import { PLACES, inBangladesh, nearestPlace } from "@/lib/places";
+import { PLACES, nearestPlace } from "@/lib/places";
 
 const WORDS = {
   en: {
@@ -95,7 +97,7 @@ function readCurrentAir(value: unknown, location: Location): CurrentAir {
   const data = value as Record<string, unknown>;
   if (typeof data.lat !== "number" || typeof data.lon !== "number" ||
       !Number.isFinite(data.lat) || !Number.isFinite(data.lon) ||
-      Math.abs(data.lat - location.lat) > 0.0001 || Math.abs(data.lon - location.lon) > 0.0001 ||
+      data.lat !== location.lat || data.lon !== location.lon ||
       typeof data.now !== "object" || data.now === null) {
     throw new Error("Air report does not match the requested location");
   }
@@ -133,6 +135,7 @@ export function ExposureCalculator() {
   const { lang, setLang, num } = useI18n();
   const t = WORDS[lang];
   const [location, setLocation] = useState<Location>(INITIAL_LOCATION);
+  const [restored, setRestored] = useState(false);
   const [profile, setProfile] = useState<Omit<ExposureProfile, "outdoorHours">>(() => ({
     ageGroup: DEFAULT_EXPOSURE_PROFILE.ageGroup,
     activity: DEFAULT_EXPOSURE_PROFILE.activity,
@@ -165,17 +168,12 @@ export function ExposureCalculator() {
 
   // Read only the selected location from the dashboard; do not persist health/sensitivity data.
   useEffect(() => {
-    try {
-      const saved: unknown = JSON.parse(localStorage.getItem("nirmol.loc") ?? "null");
-      if (!saved || typeof saved !== "object") return;
-      const value = saved as { lat?: unknown; lon?: unknown; placeId?: unknown };
-      if (typeof value.lat !== "number" || typeof value.lon !== "number" || !inBangladesh(value.lat, value.lon)) return;
-      const p = PLACES.find((place) => place.id === value.placeId);
-      setLocation(p ? { lat: p.lat, lon: p.lon, placeId: p.id } : { lat: value.lat, lon: value.lon, placeId: null });
-    } catch { /* Saved location is optional. */ }
+    setLocation(restoreDashboardLocation(() => localStorage.getItem("nirmol.loc")));
+    setRestored(true);
   }, []);
 
   useEffect(() => {
+    if (!restored) return;
     const controller = new AbortController();
     let active = true;
     const timeout = window.setTimeout(() => {
@@ -203,7 +201,7 @@ export function ExposureCalculator() {
       window.clearTimeout(timeout);
       controller.abort();
     };
-  }, [location, requestKey]);
+  }, [location, requestKey, restored]);
 
   const current = status === "ready" && air && nowMs !== null && air.now.kind !== "demo" &&
     // Check receipt time too: a rejected forecast must not become "current"

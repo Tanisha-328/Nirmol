@@ -11,7 +11,12 @@ async function moduleUrl(path, replacements = {}) {
   let source = await readFile(new URL(path, import.meta.url), "utf8");
   for (const [from, to] of Object.entries(replacements)) source = source.replaceAll(`"${from}"`, `"${to}"`);
   const { outputText } = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } });
-  return `data:text/javascript;base64,${Buffer.from(outputText).toString("base64")}`;
+  let code = outputText;
+  for (const match of [...code.matchAll(/from ["'](\.[^"']+)["']/g)]) {
+    const dependency = new URL(`${match[1]}.ts`, new URL(path, import.meta.url));
+    code = code.replace(match[0], `from ${JSON.stringify(await moduleUrl(dependency))}`);
+  }
+  return `data:text/javascript;base64,${Buffer.from(code).toString("base64")}`;
 }
 const places = await moduleUrl("../src/lib/places.ts");
 const account = await moduleUrl("../src/lib/account.ts", { "./places": places });
@@ -32,7 +37,7 @@ test("account defaults are unsaved, independent non-sensitive values", () => {
 
 test("account settings accept bilingual names and Bangladesh boundary coordinates without rounding", () => {
   for (const name of ["Dhaka", "ঢাকা", "🙂".repeat(80)]) {
-    const input = { ...settings, locations: [{ ...location, name, lat: 20.5, lon: 92.7 }] };
+    const input = { ...settings, locations: [{ ...location, name, lat: 23.815923, lon: 90.371084 }] };
     assert.deepEqual(parseAccountSettings(input), input);
   }
   const parsed = parseAccountSettings(settings);

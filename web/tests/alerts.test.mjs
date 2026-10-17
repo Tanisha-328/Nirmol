@@ -23,7 +23,7 @@ const { evaluateAlerts, isValidAlertPreferences, DEFAULT_ALERT_PREFERENCES, ALER
 const HOUR = 3_600_000;
 const START = Date.parse("2026-10-16T18:00:00Z"); // midnight Asia/Dhaka
 const NOW = START + HOUR / 2;
-const location = { lat: 23.7808, lon: 90.4067, placeId: "dhaka" };
+const location = { lat: 23.796374, lon: 90.424614, placeId: "dhaka-reference" };
 const prefs = { threshold: 35, lookAheadHours: 6 };
 const iso = (time) => new Date(time).toISOString();
 function report(values = Array(25).fill(20), overrides = {}) {
@@ -429,7 +429,7 @@ test("genuinely new concentrations, target hours, issuance or location redisplay
   const target = structuredClone(oldInput); target.now.time = iso(START + HOUR); target.fetchedAt = iso(START + HOUR);
   assert.notEqual(evaluate(target, prefs, START + HOUR).alerts[0].id, first.id);
   const customLocation = { lat: location.lat + 0.001, lon: location.lon, placeId: null };
-  const moved = structuredClone(oldInput); moved.lat = customLocation.lat;
+  const moved = structuredClone(oldInput); moved.lat = customLocation.lat; moved.now.source = "cams"; delete moved.now.issuedAt; moved.forecastSource = "cams"; delete moved.forecastIssuedAt;
   assert.notEqual(evaluate(moved, prefs, NOW, customLocation).alerts[0].id, first.id);
 });
 

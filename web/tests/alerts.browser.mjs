@@ -261,6 +261,7 @@ test("gaps split forecast events and partial coverage is explicitly disclosed", 
 });
 
 test("expired model issuance cannot generate alerts despite freshly fetched data", async () => {
+  await context.addInitScript(() => localStorage.setItem("nirmol.loc", JSON.stringify({ lat: 23.796374, lon: 90.424614, placeId: "dhaka-reference" })));
   await open(); const data = fixture(baseURL);
   const issuedAt = new Date(NOW - 3 * HOUR - 1).toISOString();
   await finish(0, { now: { ...data.now, time: new Date(FIRST).toISOString(), source: "nirmol", issuedAt }, forecastSource: "nirmol", forecastIssuedAt: issuedAt, inDhakaModelArea: true });
@@ -269,6 +270,7 @@ test("expired model issuance cannot generate alerts despite freshly fetched data
 });
 
 test("legacy Nirmol snapshots without issuance do not masquerade as fresh model alerts", async () => {
+  await context.addInitScript(() => localStorage.setItem("nirmol.loc", JSON.stringify({ lat: 23.796374, lon: 90.424614, placeId: "dhaka-reference" })));
   await open(); const data = fixture(baseURL);
   await finish(0, { now: { ...data.now, source: "nirmol" }, forecastSource: "nirmol", inDhakaModelArea: true });
   assert.equal(await cards().count(), 0);
@@ -276,6 +278,7 @@ test("legacy Nirmol snapshots without issuance do not masquerade as fresh model 
 });
 
 test("a fresh custom model keeps its distinct current and forecast issuance provenance", async () => {
+  await context.addInitScript(() => localStorage.setItem("nirmol.loc", JSON.stringify({ lat: 23.796374, lon: 90.424614, placeId: "dhaka-reference" })));
   await open(); const data = fixture(baseURL); const issuedAt = new Date(NOW - HOUR).toISOString();
   await finish(0, { now: { ...data.now, time: new Date(FIRST).toISOString(), source: "nirmol", issuedAt }, forecastSource: "nirmol", forecastIssuedAt: issuedAt, inDhakaModelArea: true });
   await cards().first().waitFor();
@@ -286,6 +289,7 @@ test("a fresh custom model keeps its distinct current and forecast issuance prov
 });
 
 test("the advancing open-page clock expires data without network polling or repeated live announcements", async () => {
+  await context.addInitScript(() => localStorage.setItem("nirmol.loc", JSON.stringify({ lat: 23.796374, lon: 90.424614, placeId: "dhaka-reference" })));
   await open(); const data = fixture(baseURL); const issuedAt = new Date(NOW - 3 * HOUR + 60_000).toISOString();
   await finish(0, { now: { ...data.now, time: new Date(FIRST).toISOString(), source: "nirmol", issuedAt }, forecastSource: "nirmol", forecastIssuedAt: issuedAt, inDhakaModelArea: true });
   await cards().first().waitFor();
@@ -416,6 +420,7 @@ test("dismissed current events stay dismissed on equivalent refresh but new sour
 });
 
 test("CAMS to custom source refresh cannot retain a dismissed or obsolete source identity", async () => {
+  await context.addInitScript(() => localStorage.setItem("nirmol.loc", JSON.stringify({ lat: 23.796374, lon: 90.424614, placeId: "dhaka-reference" })));
   await open(); await finish(); await cards().first().waitFor();
   await forecast().getByRole("button", { name: "Dismiss alert", exact: true }).first().click();
   await refresh().click(); await started(2);
@@ -608,6 +613,7 @@ test("CAMS cannot acquire measured provenance through a malformed response", asy
 });
 
 test("new forecast issuance redisplays an event dismissed for an older run", async () => {
+  await context.addInitScript(() => localStorage.setItem("nirmol.loc", JSON.stringify({ lat: 23.796374, lon: 90.424614, placeId: "dhaka-reference" })));
   await open(); const old = new Date(NOW - 2 * HOUR).toISOString();
   await finish(0, { forecastSource: "nirmol", forecastIssuedAt: old, inDhakaModelArea: true });
   await forecast().getByTestId("alert-card").first().waitFor();

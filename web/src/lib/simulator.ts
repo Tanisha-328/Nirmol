@@ -77,7 +77,7 @@ export function readSimulatorCurrent(value: unknown, location: SimulatorLocation
   if (!inBangladesh(location.lat, location.lon) ||
       typeof data.lat !== "number" || typeof data.lon !== "number" ||
       !Number.isFinite(data.lat) || !Number.isFinite(data.lon) ||
-      Math.abs(data.lat - location.lat) > 0.0001 || Math.abs(data.lon - location.lon) > 0.0001 ||
+      data.lat !== location.lat || data.lon !== location.lon ||
       !data.now || typeof data.now !== "object" || typeof data.fetchedAt !== "string" ||
       !freshFetch(data.fetchedAt, receivedAtMs)) throw new Error("Invalid current provenance or location");
   const current = data.now as Record<string, unknown>;

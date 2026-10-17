@@ -1,5 +1,7 @@
 "use client";
 
+import { restoreDashboardLocation } from "@/lib/dashboard-location";
+
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
@@ -7,7 +9,7 @@ import {
   type ActivityLevel, type AgeGroup,
 } from "@/lib/exposure";
 import { useI18n } from "@/lib/i18n";
-import { inBangladesh, nearestPlace, PLACES } from "@/lib/places";
+import { nearestPlace, PLACES } from "@/lib/places";
 import {
   compareCurrent, compareForecast, compareHypothetical, readSimulatorCurrent,
   type SimulatorComparison, type SimulatorCurrent, type SimulatorPerson,
@@ -90,6 +92,7 @@ export function WhatIfSimulator() {
   const t = WORDS[lang];
   const [mode, setMode] = useState<Mode>("hypothetical");
   const [location, setLocation] = useState<Location>(INITIAL_LOCATION);
+  const [restored, setRestored] = useState(false);
   const [person, setPerson] = useState<SimulatorPerson>({ ageGroup: DEFAULT_EXPOSURE_PROFILE.ageGroup, sensitivities: [] });
   const [scenarios, setScenarios] = useState<Record<ScenarioName, InputScenario>>({
     baseline: { pm25: "80", hours: "2", activity: "walking", departure: "" },
@@ -117,18 +120,12 @@ export function WhatIfSimulator() {
   }, []);
 
   useEffect(() => {
-    try {
-      const saved: unknown = JSON.parse(localStorage.getItem("nirmol.loc") ?? "null");
-      if (!saved || typeof saved !== "object") return;
-      const p = saved as { lat?: unknown; lon?: unknown; placeId?: unknown };
-      if (typeof p.lat !== "number" || typeof p.lon !== "number" || !inBangladesh(p.lat, p.lon)) return;
-      const place = PLACES.find((v) => v.id === p.placeId);
-      setLocation(place ? { lat: place.lat, lon: place.lon, placeId: place.id } : { lat: p.lat, lon: p.lon, placeId: null });
-    } catch { /* Saved location is optional; no profile data is read or written. */ }
+    setLocation(restoreDashboardLocation(() => localStorage.getItem("nirmol.loc")));
+    setRestored(true);
   }, []);
 
   useEffect(() => {
-    if (mode === "hypothetical") return;
+    if (!restored || mode === "hypothetical") return;
     const controller = new AbortController();
     let active = true;
     const timeout = window.setTimeout(() => {
@@ -153,7 +150,7 @@ export function WhatIfSimulator() {
       .catch(() => { if (active) setAirState({ key, status: "error" }); })
       .finally(() => window.clearTimeout(timeout));
     return () => { active = false; controller.abort(); window.clearTimeout(timeout); };
-  }, [key, location, mode]);
+  }, [key, location, mode, restored]);
 
   function updateScenario(name: ScenarioName, field: keyof InputScenario, value: string) {
     setScenarios((previous) => ({ ...previous, [name]: { ...previous[name], [field]: value } }));

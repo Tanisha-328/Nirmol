@@ -3,7 +3,7 @@
 import type { AirReport, ForecastPoint } from "./air";
 import { isUsableCurrentEstimate, isValidConcentration } from "./exposure";
 import { readForecastFactors, type ForecastExplanation } from "./forecast-explanation";
-import { inDhakaModelArea } from "./places";
+import { inBangladesh, inDhakaModelArea, validCoordinates } from "./places";
 
 export function object(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === "object" && !Array.isArray(value)
@@ -228,7 +228,8 @@ export function readAirReport(value: unknown, location: { lat: number; lon: numb
   const data = object(value);
   if (!data || typeof data.lat !== "number" || typeof data.lon !== "number" ||
       !Number.isFinite(data.lat) || !Number.isFinite(data.lon) ||
-      Math.abs(data.lat - location.lat) > 0.0001 || Math.abs(data.lon - location.lon) > 0.0001 ||
+      !inBangladesh(data.lat, data.lon) ||
+      data.lat !== location.lat || data.lon !== location.lon ||
       (data.forecastSource !== "cams" && data.forecastSource !== "nirmol") ||
       typeof data.inDhakaModelArea !== "boolean" || !Array.isArray(data.forecast) || data.forecast.length > 25 ||
       typeof data.fetchedAt !== "string" || !isFreshModelIssue(data.fetchedAt, nowMs) ||
@@ -236,6 +237,10 @@ export function readAirReport(value: unknown, location: { lat: number; lon: numb
         typeof data.forecastIssuedAt !== "string" || !Number.isFinite(absoluteTime(data.forecastIssuedAt))))) {
     throw new Error("Invalid air report provenance or location");
   }
+  if ((data.forecastSource === "nirmol" || object(data.now)?.source === "nirmol") && !inDhakaModelArea(data.lat, data.lon)) {
+    throw new Error("Custom model outside evaluated reference");
+  }
+  const grid = object(data.camsGrid);
   return {
     lat: data.lat, lon: data.lon, now: readCurrent(data.now, nowMs),
     weather: readWeather(data.weather, nowMs), forecast: readForecast(data.forecast,
@@ -243,5 +248,7 @@ export function readAirReport(value: unknown, location: { lat: number; lon: numb
       typeof data.forecastIssuedAt === "string" ? { issuedAt: data.forecastIssuedAt, nowMs } : undefined),
     forecastSource: data.forecastSource, inDhakaModelArea: data.inDhakaModelArea, fetchedAt: data.fetchedAt,
     ...(typeof data.forecastIssuedAt === "string" ? { forecastIssuedAt: data.forecastIssuedAt } : {}),
+    ...(grid && typeof grid.lat === "number" && typeof grid.lon === "number" && validCoordinates(grid.lat, grid.lon)
+      ? { camsGrid: { lat: grid.lat, lon: grid.lon } } : {}),
   };
 }

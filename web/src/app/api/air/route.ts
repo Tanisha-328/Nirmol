@@ -6,7 +6,9 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const lat = Number(searchParams.get("lat"));
   const lon = Number(searchParams.get("lon"));
-  if (!Number.isFinite(lat) || !Number.isFinite(lon) || !inBangladesh(lat, lon)) {
+  if (searchParams.getAll("lat").length !== 1 || searchParams.getAll("lon").length !== 1 ||
+      !searchParams.get("lat")?.trim() || !searchParams.get("lon")?.trim() ||
+      !Number.isFinite(lat) || !Number.isFinite(lon) || !inBangladesh(lat, lon)) {
     return NextResponse.json({ error: "Location must be inside Bangladesh." }, { status: 400, headers: { "Cache-Control": "no-store" } });
   }
   try {
