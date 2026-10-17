@@ -2,12 +2,14 @@
 
 Bangla-first air-quality forecasting, personal exposure guidance and citizen pollution reporting for Bangladesh.
 
-The agreed scope, stack and schedule are in [docs/plan.md](docs/plan.md).
+The historical plan is in [docs/plan.md](docs/plan.md). Current routes, ownership,
+authentication, deployment limitations and verification are in
+[docs/team-handoff.md](docs/team-handoff.md).
 
 ## Layout
 
 ```
-web/                    Next.js app (UI + API routes: reports, advisor, trips)
+web/                    Next.js public tools, Auth and protected My Nirmol
 jobs/                   Python scripts run by GitHub Actions (ingestion, hourly forecast)
 ml/                     Data audit, notebooks, trained model artifacts
 supabase/migrations/    Database schema
@@ -16,10 +18,22 @@ supabase/migrations/    Database schema
 
 ## Setup
 
-1. Copy `.env.example` to `web/.env.local` and fill in the keys.
-2. Run `supabase/migrations/0001_init.sql` in the Supabase SQL editor. Enable **Anonymous sign-ins** and the **Google** provider under Authentication. Create a private `report-photos` storage bucket.
-3. `cd web && npm install && npm run dev`
-4. Data audit: `pip install -r jobs/requirements.txt && python jobs/audit_openaq_stations.py`
+1. Use Node 22 or newer (locally verified: Node 24). From `web`, run `npm ci`
+   and `npm run dev`. Public environmental tools do not require an account.
+2. Optional Auth: copy `.env.example` to `web/.env.local` and configure only the
+   real public Supabase URL/key and the canonical `NIRMOL_SITE_URL` app origin.
+   Production Auth requires that explicit HTTPS origin. See the handoff for
+   email confirmation/recovery allowlists and browser-bound PKCE callbacks.
+   Google OAuth is deferred; no anonymous sign-in or Google setup is required.
+3. Account storage migration `0003_account_settings.sql` is **unapplied and not
+   production verified**. Review/test it in a disposable environment first.
+   Do not bulk-run migrations: that would also apply unverified A06 migration
+   `0002`. No live migration is part of local setup. F06/F08 integration remains
+   with Member 02; no reporting bucket or advisor route is fabricated here.
+4. Offline model verification: create a Python 3.14 virtual environment, install
+   `jobs/requirements.txt` with `--require-hashes --only-binary=:all:`, then run
+   `python -B jobs/forecast_runtime.py`. This uses real artifacts and fixtures,
+   without provider or publication calls.
 
 ## Experimental A06 publisher: keep disabled
 
@@ -49,4 +63,7 @@ enable the A06 publisher.
 
 ## Data attribution
 
-Weather and air-quality model data from [Open-Meteo](https://open-meteo.com/) (CC BY 4.0). Station data via [OpenAQ](https://openaq.org/). Routing by [openrouteservice](https://openrouteservice.org/). Map data © OpenStreetMap contributors.
+Weather and air-quality model data from [Open-Meteo](https://open-meteo.com/)
+(CC BY 4.0). Historical training measurements are documented in the model
+evaluation and station audit, including [OpenAQ](https://openaq.org/). Street
+routing and the teammate community map are not integrated in this checkout.

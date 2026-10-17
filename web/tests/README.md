@@ -1,3 +1,22 @@
+# Auth and My Nirmol
+
+Use Node 22+ and the committed npm lockfile. From `web`, run all unit suites with
+`node --test tests/*.test.mjs`, TypeScript, zero-warning lint and a fresh build.
+Then run `node tests/auth.browser.mjs C:/path/to/node_modules/playwright`.
+The Auth suite starts its own production Next server on loopback port 3002 and a
+controlled GoTrue/PostgREST protocol fixture. Do not start another server on 3002.
+It uses test-only keys/tokens in child-process memory; no live Supabase, email,
+database migration or environmental provider is used. Fake protocol responses do
+not verify SQL/RLS, provider settings, email delivery or deployed authentication.
+Screenshots are written to the operating system's temporary directory.
+
+The other six browser suites use the separately served fresh build on port 3001
+and controlled air fixtures. Run them all as well. Do not substitute production
+services for fixtures. Real PostgreSQL tests in `supabase/tests/account_settings.sql`
+require an explicitly provisioned disposable Supabase-compatible database;
+they have not been executed on this machine. See `docs/team-handoff.md` for the
+account-only migration review and the A06 prohibition on bulk migration setup.
+
 # F10 in-app pollution alerts
 
 From `web`, run `node --test tests/alerts.test.mjs tests/alert-preferences.test.mjs`.
