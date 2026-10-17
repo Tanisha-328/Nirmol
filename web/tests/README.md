@@ -1,3 +1,29 @@
+# Phase 04 F08 advisor
+
+Run the same full unit/type/lint/build and browser commands below. The browser
+runner now includes `advisor.browser.mjs`, owns/checks port 3005 as well as
+3001–3004, clears real advisor/provider configuration for child processes and
+writes `%TEMP%/nirmol-f08-regression-<suite>.log` receipts.
+
+F08 can run alone with `node tests/advisor.browser.mjs <Playwright-path>` after
+a fresh build. It starts its own Next server on 3005. A test-only child-process
+preload redirects only the fixed Gemini/Open-Meteo server fetch origins to the
+owned loopback protocol fixture. Production code has no alternative provider URL
+or mock fallback. The suite uses actual server air validation, the shared Gemini
+transport, authenticated/user or signed-guest quota RPC adapters and real HTTP
+handlers. External browser requests are blocked. These fixtures do not prove
+PostgreSQL locking, grants, RLS or live model quality/availability.
+
+`advisor.test.mjs` and `advisor-api.test.mjs` cover exact schemas, environmental
+freshness/coverage, input/time/location boundaries, HMAC cookies, safe enum plans,
+prompt injection, provider errors/timeouts, retry accounting, session changes,
+concurrency orchestration and no fabricated numeric evidence.
+
+Real, separately gated tests are `supabase/tests/advisor_quotas.sql` and
+`node --test tests/advisor.quota.integration.mjs`. Missing disposable configuration
+skips the SDK suite, never passes real enforcement. Follow `docs/f08-ai-advisor.md`.
+The opt-in live smoke script is not run by builds or regression commands.
+
 # Phase 03 Community Map and moderation
 
 From `web`, run `node --test tests/*.test.mjs`, `npx tsc --noEmit`,

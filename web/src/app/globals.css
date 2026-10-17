@@ -76,3 +76,5 @@ body {
 .community-canvas .leaflet-control-attribution { background: #fff; color: #253b46; }
 .community-canvas .leaflet-control-attribution a { color: #075c70; }
 .community-page [hidden] { display: none !important; }
+.advisor-intro { border-top: 4px solid #0b686b; }
+.advisor-answer { border-left: 4px solid #0b686b; }

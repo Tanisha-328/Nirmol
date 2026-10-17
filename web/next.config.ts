@@ -3,7 +3,7 @@ import { AUTH_PRIVATE_HEADERS } from "./src/lib/auth";
 
 const nextConfig: NextConfig = {
   async headers() {
-    return [{ source: "/moderation", headers: Object.entries(AUTH_PRIVATE_HEADERS).map(([key, value]) => ({ key, value })) }];
+    return ["/moderation", "/advisor"].map(source => ({ source, headers: Object.entries(AUTH_PRIVATE_HEADERS).map(([key, value]) => ({ key, value })) }));
   },
 };
 

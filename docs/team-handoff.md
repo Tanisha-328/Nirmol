@@ -1,5 +1,27 @@
 # Nirmol team handoff
 
+**Phase 04 local follow-up, 18 October 2026 (Asia/Dhaka):** verified Phase 03
+committed at `1ac5bd2e840e91d4708016f380acf021ec31824f` on
+`fix/location-reliability`, with a clean starting tree/index. F08 now has the public
+`/advisor`, real server Gemini integration, validated existing air-data grounding,
+explicit place/activity consent, session-only conversation and additive, unapplied
+`0006_advisor_quotas.sql`. The model selects reviewed guidance and valid fact IDs;
+unrestricted model prose/numbers are not displayed. See
+[the F08 architecture, privacy/quotas, executable checks and final results](f08-ai-advisor.md).
+No commit, stage, push, deployment, hosted configuration, migration or A06 change
+was performed. Live Gemini and real quota/RLS/grant enforcement remain unverified.
+Older “F08 absent” and “Phase 03 uncommitted” statements below are historical.
+
+Final Phase 04 local verification: **436 web unit/API/maintenance + 318 browser +
+51 Python = 805 passed, zero failed**. All ten browser suites passed against the
+final fresh production build. Three real disposable Supabase SDK suites skipped;
+actual quota/RLS/Storage enforcement and live Gemini remain unverified. TypeScript,
+strict zero-warning ESLint, dependency verification and whitespace checks pass.
+The F08 review records all 32 changed files, receipts, guest identity limitations,
+provider/retention costs and Phase 05 release prerequisites. No existing regression
+tests were weakened; all changes remain local and unstaged, A06 remains disabled,
+and the inherited development `braces` advisory remains unresolved.
+
 **Phase 03 local follow-up, 18 October 2026 (Asia/Dhaka):** verified clean
 `fix/location-reliability` at `60c09e4`; Phase 2 is committed there. The historical
 “uncommitted” and “map/moderator absent” statements below describe the earlier

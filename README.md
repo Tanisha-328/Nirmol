@@ -34,8 +34,11 @@ supabase/migrations/    Database schema
    Phase 3 adds `/community`, `/moderation` and the separate, **unapplied**
    `0005_community_moderation.sql`. See [Community Map and moderation](docs/community-map-moderation.md)
    for contracts, verification and secure test-reviewer provisioning. Real
-   DB/Storage/provider enforcement is unverified. F08 remains pending. Reporting AI
-   is optional and off by default.
+   DB/Storage/provider enforcement is unverified. `/advisor` now adds public F08
+   advice with separate, **unapplied** `0006_advisor_quotas.sql`, a server-only Gemini
+   model/key and guest-cookie secret. It fails closed without its secure quota
+   backend. See [F08 architecture and verification](docs/f08-ai-advisor.md).
+   Reporting AI and advisor AI are optional and off by default.
 4. Offline model verification: create a Python 3.14 virtual environment, install
    `jobs/requirements.txt` with `--require-hashes --only-binary=:all:`, then run
    `python -B jobs/forecast_runtime.py`. This uses real artifacts and fixtures,
