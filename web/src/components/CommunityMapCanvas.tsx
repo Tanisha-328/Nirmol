@@ -15,7 +15,7 @@ export default function CommunityMapCanvas({ cells, selected, onSelect, lang }: 
   const [tiles, setTiles] = useState(false), [tileFailure, setTileFailure] = useState(false), [attempt, setAttempt] = useState(0);
   useEffect(() => {
     if (!container.current) return;
-    const view = L.map(container.current, { minZoom: 6, maxZoom: 11, maxBounds: BOUNDS, maxBoundsViscosity: 1, scrollWheelZoom: false });
+    const view = L.map(container.current, { minZoom: 6, maxZoom: 11, maxBounds: BOUNDS, maxBoundsViscosity: 1, scrollWheelZoom: false, zoomControl: false });
     map.current = view; view.fitBounds(BOUNDS);
     const boundary: MultiPolygon = { type: "MultiPolygon", coordinates: BANGLADESH_POLYGONS };
     L.geoJSON(boundary, { style: { color: "#0b686b", weight: 2, fillColor: "#c2e3db", fillOpacity: 0.35 }, interactive: false,
@@ -24,6 +24,11 @@ export default function CommunityMapCanvas({ cells, selected, onSelect, lang }: 
     const observer = new ResizeObserver(() => view.invalidateSize()); observer.observe(container.current);
     return () => { observer.disconnect(); view.remove(); map.current = null; markers.current = null; };
   }, []);
+  useEffect(() => {
+    const view = map.current; if (!view) return;
+    const zoom = L.control.zoom({ zoomInTitle: lang === "en" ? "Zoom in" : "বড় করুন", zoomOutTitle: lang === "en" ? "Zoom out" : "ছোট করুন" }).addTo(view);
+    return () => { zoom.remove(); };
+  }, [lang]);
   useEffect(() => {
     const group = markers.current; if (!group) return;
     group.clearLayers();

@@ -74,6 +74,12 @@ function ReportForm({userId,active,accountChanged}:{userId:string;active:boolean
   const [reports,setReports]=useState<OwnReport[]>([]),[loading,setLoading]=useState(false),[next,setNext]=useState<string|null>(null);
   const alive=useRef(true),generation=useRef(0),historySequence=useRef(0),controllers=useRef(new Set<AbortController>()),pending=useRef(false),snapshot=useRef<CreateReport|null>(null),uploadId=useRef<string|null>(null),imageRef=useRef<string|null>(null),geoSequence=useRef(0),geoTimer=useRef<ReturnType<typeof setTimeout>|null>(null),fileInput=useRef<HTMLInputElement>(null);
   const activeRef=useRef(active);activeRef.current=active;
+  const receiptRef=useRef<HTMLElement>(null),categoryRef=useRef<HTMLSelectElement>(null),focusedReceipt=useRef<string|null>(null),restartFocus=useRef(false);
+  useEffect(()=>{
+    if(!active)return;
+    if(receipt&&focusedReceipt.current!==receipt.id){receiptRef.current?.focus();focusedReceipt.current=receipt.id;}
+    else if(!receipt&&restartFocus.current){categoryRef.current?.focus();restartFocus.current=false;}
+  },[active,receipt]);
   const current=useCallback((g:number)=>alive.current&&activeRef.current&&generation.current===g,[]);
   const cancelOperations=useCallback(()=>{generation.current++;historySequence.current++;controllers.current.forEach(c=>c.abort());geoSequence.current++;if(geoTimer.current)clearTimeout(geoTimer.current);},[]);
   useEffect(()=>{alive.current=true;setObserved(dhakaInput(Date.now()));return()=>{alive.current=false;cancelOperations();};},[cancelOperations]);
@@ -169,16 +175,16 @@ function ReportForm({userId,active,accountChanged}:{userId:string;active:boolean
       }else failure(e);
     }}
   }
-  function reset(){snapshot.current=null;uploadId.current=null;imageRef.current=null;setReceipt(null);setFrozen(false);setFile(null);setImageId(null);setSuggestion(null);setCategory("");setCategoryConfirmed(false);setDescription("");setObserved(dhakaInput(Date.now()));changePoint("","");setPublicConsent(false);setAiConsent(false);setNotice(null);}
+  function reset(){restartFocus.current=true;focusedReceipt.current=null;snapshot.current=null;uploadId.current=null;imageRef.current=null;setReceipt(null);setFrozen(false);setFile(null);setImageId(null);setSuggestion(null);setCategory("");setCategoryConfirmed(false);setDescription("");setObserved(dhakaInput(Date.now()));changePoint("","");setPublicConsent(false);setAiConsent(false);setNotice(null);}
   const pointValid=lat.trim()!==""&&lon.trim()!==""&&inBangladesh(Number(lat),Number(lon));
   return <div hidden={!active} data-testid="report-private" className="space-y-5">
     {notice&&<p role="alert" className="rounded-xl border border-[var(--border)] p-3 text-sm">{t[notice]}</p>}
     {busy&&<p role="status">{t.busy}</p>}
-    {receipt?<section className={CARD} data-testid="report-receipt"><h2 className="text-xl font-semibold">{t.success}</h2><p>{t.successHelp}</p><p className="break-all text-sm">{receipt.id}</p><p>{CATEGORY[lang][receipt.category]} · {STATUS[lang][receipt.status]}</p><button type="button" className={BUTTON} onClick={reset}>{t.another}</button></section>:
+    {receipt?<section ref={receiptRef} tabIndex={-1} aria-labelledby="report-receipt-title" className={`${CARD} focus:outline-2 focus:outline-offset-2 focus:outline-[var(--accent)]`} data-testid="report-receipt"><h2 id="report-receipt-title" className="text-xl font-semibold">{t.success}</h2><p>{t.successHelp}</p><p className="break-all text-sm">{receipt.id}</p><p>{CATEGORY[lang][receipt.category]} · {STATUS[lang][receipt.status]}</p><button type="button" className={BUTTON} onClick={reset}>{t.another}</button></section>:
     <form onSubmit={e=>{e.preventDefault();void operation(submit);}} className="space-y-5">
       {frozen&&<p role="status" className={CARD}>{t.frozen}</p>}
       <fieldset disabled={busy||frozen||!active} className={CARD}><legend className="px-2 font-semibold">{t.form}</legend>
-        <label className="block text-sm font-medium">{t.category}<select className={FIELD} value={category} required onChange={e=>{setCategory(e.target.value as ReportCategory);setCategoryConfirmed(false);}}><option value="">{t.choose}</option>{REPORT_CATEGORIES.map(c=><option key={c} value={c}>{CATEGORY[lang][c]}</option>)}</select></label>
+        <label className="block text-sm font-medium">{t.category}<select ref={categoryRef} className={FIELD} value={category} required onChange={e=>{setCategory(e.target.value as ReportCategory);setCategoryConfirmed(false);}}><option value="">{t.choose}</option>{REPORT_CATEGORIES.map(c=><option key={c} value={c}>{CATEGORY[lang][c]}</option>)}</select></label>
         <label className="flex items-start gap-3 text-sm"><input className="mt-1 h-5 w-5 shrink-0" type="checkbox" checked={categoryConfirmed} onChange={e=>setCategoryConfirmed(e.target.checked)}/>{t.categoryConfirm}</label>
         <div><label htmlFor="report-description" className="block text-sm font-medium">{t.description}</label><textarea id="report-description" className={FIELD} rows={3} maxLength={1000} value={description} onChange={e=>{setDescription(e.target.value);setSuggestion(null);}} aria-describedby="report-description-help"/></div><p id="report-description-help" className="text-xs text-[var(--muted)]">{t.descriptionHelp}</p>
         <label className="block text-sm font-medium">{t.observed}<input className={FIELD} type="datetime-local" value={observed} required onChange={e=>setObserved(e.target.value)}/></label><p className="text-xs text-[var(--muted)]">{t.observationHelp}</p>

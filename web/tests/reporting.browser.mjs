@@ -211,3 +211,22 @@ test("Bangla/English mobile and desktop controls are labelled, keyboard-operable
   for(const lang of ["en","bn"]){if(lang==="bn")await page.getByRole("button",{name:"Switch language: বাংলা",exact:true}).click();for(const width of [320,375,768,1280])for(const colorScheme of ["light","dark"]){await page.setViewportSize({width,height:900});await page.emulateMedia({colorScheme});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`${lang}/${width}/${colorScheme}`);assert.equal(await page.locator('input[type="number"]').count(),2);if(width===320&&colorScheme==="dark")await page.screenshot({path:join(screenshots,`${lang}-320.png`),fullPage:true});}}
   await page.getByRole("button",{name:"Switch language: English",exact:true}).click();await page.getByRole("combobox",{name:"Suspected source",exact:true}).focus();await page.keyboard.press("ArrowDown");await page.keyboard.press("Enter");assert.notEqual(await page.getByRole("combobox",{name:"Suspected source",exact:true}).inputValue(),"");
 });
+
+test("05C keyboard submission focuses its receipt and restarting focuses the new category",async()=>{
+  await login();await open();await form();
+  const tabTo=async locator=>{for(let i=0;i<70;i++){if(await locator.evaluate(el=>el===document.activeElement))return;await page.keyboard.press("Tab");}assert.fail("Keyboard could not reach the intended control");};
+  const category=page.getByRole("combobox",{name:"Suspected source",exact:true});await tabTo(category);
+  await page.keyboard.press("Home");await page.keyboard.press("ArrowDown");await page.keyboard.press("Enter");
+  assert.equal(await category.inputValue(),"waste_burning");
+  await tabTo(page.getByRole("checkbox",{name:/^I reviewed and confirm/}));await page.keyboard.press("Space");
+  await tabTo(page.getByLabel("Incident latitude",{exact:true}));await page.keyboard.insertText("23.815923456");
+  await tabTo(page.getByLabel("Incident longitude",{exact:true}));await page.keyboard.insertText("90.371084567");
+  await tabTo(page.getByRole("checkbox",{name:/^I inspected this incident/}));await page.keyboard.press("Space");
+  await tabTo(page.getByRole("checkbox",{name:/^I agree that after/}));await page.keyboard.press("Space");
+  await tabTo(submit());await page.keyboard.press("Enter");
+  const receipt=page.getByTestId("report-receipt");await receipt.waitFor();
+  assert.equal(await receipt.evaluate(el=>el===document.activeElement),true,"replacing the form must not lose keyboard focus to body");
+  assert.equal(state.reports.size,1);assert.equal([...state.reports.values()][0].owner,A);
+  await page.keyboard.press("Tab");await page.keyboard.press("Enter");
+  await category.waitFor();assert.equal(await category.evaluate(el=>el===document.activeElement),true);
+});

@@ -1,5 +1,40 @@
 # Nirmol team handoff
 
+**Phase 05C local product validation, 18 October 2026 (Asia/Dhaka):** started
+clean at owner-committed `7d345ccc4d6b9e8c3fb7c53e9e787420d9a1bf74` on
+`fix/location-reliability`; branch/HEAD remain unchanged. The earlier 05A/05B
+uncommitted-state statements below are historical. Their existing work is
+preserved. Five reproduced P2 corrections: F06 receipt/restart keyboard focus,
+bilingual map zoom controls, reserved map/advisor loading space and stable
+dashboard navigation rows. No scientific formula, model, backend/migration,
+package/lock, Auth design/background or A06 safety guard changed.
+
+Final full regression: **449 web + 327 browser + 55 Python = 831 passed, zero
+failed**. All twelve browser suites pass against the fresh production build.
+Real Supabase SDK suites: **0 passed, 0 failed, 3 skipped**, with opt-ins forced
+false; no hosted/local DB or live Gemini request occurred. TypeScript, strict
+zero-warning ESLint, build, native SHAP, dependency-tree and whitespace pass.
+Fresh registry audit still reports **5 HIGH development findings, 0 critical**.
+The 132 new axe/keyboard states plus 44 retained states have zero automated
+violations/overflow; **62 incomplete manual groups** remain. Early font/language
+layout shifts persist (maximum observed cumulative value 0.16062), not claimed
+as production Core Web Vitals. No real volunteers, physical devices or AT tested.
+
+Isolated warm HTTP load: 10/25/50/100 paced VUs, 15 seconds each, **2,775/2,775
+successful requests**, zero errors/timeouts; p95 **39.05/32.54/40.61/39.21 ms**.
+Peak actual in-flight 27, peak server RSS 212.98 MiB; all upstreams synthetic.
+This establishes no deployed concurrency/cost capacity. Full measured CPU,
+throughput, latency and resource receipts are in the report.
+
+See [05C feature/scenario evidence, exact receipts and 14-file manifest](phase05c-product-validation.md)
+and [planned consented volunteer/device/AT protocol](phase05c-real-user-test-script.md).
+**Ready for controlled disposable integration by teammates; not verified for an
+unrestricted real-user pilot or production launch.** Real RLS/Storage/Auth,
+concurrent moderation/withdrawal, quotas, approved capped live AI, licensed data,
+prospective scientific evaluation, moderation/cleanup/monitoring and participant
+testing remain gates. Fourteen unstaged files (9 modified, 5 new), empty index;
+no stage, commit, push, merge, deploy, migration or A06 activation.
+
 **Phase 05B partial real-service verification, 18 October 2026 (Asia/Dhaka):**
 HEAD remains `a85a824b15af8ee4de49d04749f504560e358bf3`, branch
 `fix/location-reliability`. Phase 05A was **not committed**; its 18 files were

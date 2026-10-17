@@ -1,4 +1,42 @@
-# Phase 05A independent audit
+# Phase 05C product validation
+
+The full runner now has twelve suites, ending with `product-validation.browser.mjs`.
+Existing assertions are preserved. New checks cover bilingual map zoom names,
+stable navigation and delayed map/advisor states, independent parent/worker
+arithmetic and 132 responsive axe/keyboard states (320/768/1280, both languages
+and themes). Reporting adds a complete Tab/Space/Enter submission and receipt/
+restart focus check. These are browser simulations, not participant/physical
+device, screen-reader or genuine database/provider results.
+
+`--product-validation-only` is an explicit third-argument development selector,
+not a full-regression receipt. Use a fresh TEMP/TMP directory for each full run
+to preserve earlier phase logs; the unchanged receipt filenames use `nirmol-05a-*`.
+Do not rebuild `.next` or run load traffic while browser verification is active.
+
+Optional controlled load, from `web`, after a fresh production build and with
+the other browser servers stopped:
+
+```powershell
+$env:NIRMOL_05C_LOAD = 'isolated-local-only'
+node scripts/phase05c-load.mjs
+```
+
+This uses only owned loopback port 3008, actual Next HTTP and a test-only
+`product-load-hook.cjs` preload. No alternate production backend or live provider
+is enabled. Four 15-second stages use 10/25/50/100 paced HTTP virtual users, not
+concurrent real browsers or authenticated users. Source/coordinate/body checks,
+errors/timeouts, actual in-flight count and server CPU/RSS are recorded; memory/
+error thresholds stop unsafe stages. Results are under `%TEMP%/nirmol-05c-load-*`.
+These are short local measurements, not deployed capacity or cost estimates.
+
+See `docs/phase05c-product-validation.md` for actual results and
+`docs/phase05c-real-user-test-script.md` for the unexecuted volunteer/device/AT
+protocol. Phase 05C forbids DB access: explicitly set both
+`NIRMOL_F06_DISPOSABLE` and `NIRMOL_F08_DISPOSABLE` to `false` before running the
+three real SDK suites solely to record their skips. Do not enable a target merely
+because credentials exist. A06 and live Gemini remain off.
+
+# Phase 05A independent audit (historical runner count)
 
 The full runner now includes eleven suites, ending in
 `independent-audit.browser.mjs`; receipts use `%TEMP%/nirmol-05a-regression-*.log`.
