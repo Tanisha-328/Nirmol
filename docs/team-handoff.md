@@ -188,6 +188,7 @@ The figures below distinguish executed local checks from unavailable services. B
 | ESLint | **PASS**, `npm.cmd run lint -- --max-warnings 0`, exit 0, no warnings |
 | Fresh production build | **PASS**, `npm run build`, exit 0; Next 15.5.27 production output, including Auth/account routes and middleware |
 | Python publisher/runtime/workflow suite | Fresh isolated **Windows CPython 3.14: 51/51 PASS**, 0 failures/skips, 13.032 seconds; prior checkpoint WSL Linux 51/51 is historical evidence, not a new GitHub CI run |
+| GitHub native Linux CI | **NOT EXECUTED / NOT VERIFIED**; post-push API inspection found no automatic workflow/check runs; no workflow was dispatched |
 | Native artifact/SHAP check | Fresh Windows native smoke **PASS**: 25 × 24 features, three 25-point predictions, SHAP 25 × 25, maximum log-space additivity residual **0.000003814697265625**; no retraining/network publication |
 | Clean dependency installation | Isolated `npm ci`: **368 packages, PASS**; manifest/lock hashes unchanged. Fresh hashed binary Python install: **17 applicable packages, PASS**; `pip check` PASS |
 | Production/full npm audits | Production **0 advisories**, exit 0. Full audit **5 HIGH development entries**, exit 1, from the existing single `braces` root advisory; no new Supabase advisory |
@@ -250,16 +251,33 @@ Read-only preflight was refreshed on **2026-10-17 00:26:28–00:27:38 UTC**. The
 
 - Repository: `C:\Users\tanis\Nirmol`; remote **`https://github.com/Tanisha-328/Nirmol.git`**.
 - Starting branch/checkpoint: **`fix/air-forecast-reliability`**, **`6539079`** — Harden A12 dependencies and A13 forecast runtime.
-- Starting `feature/personalization-advisor`: **`f47e7b8`**; this is an ancestor of the reliability branch. Delivery will fast-forward this owner branch to the verified handoff, preserving every existing commit and avoiding an older, unhardened branch tree.
+- Starting `feature/personalization-advisor`: **`f47e7b8`**; this was an ancestor of the reliability branch. A normal **`git merge --ff-only fix/air-forecast-reliability`** advanced it to the verified handoff, preserving every existing commit and avoiding an older, unhardened branch tree. No rebase, history rewrite, force push or merge into `main` occurred.
 - Fetched `origin/main` and local `main`: **`94c402e`**. Initial reliability checkpoint was **9 ahead / 0 behind** remote main.
 - Fetched `origin/feature/pollution-reporting`: **`94c402e`**, with no newer teammate implementation. Neither owner-side feature branch existed remotely at that snapshot.
 - Authenticated GitHub repository metadata reported admin/write access, public/unarchived repository and default branch `main`. Main was unprotected, rulesets and required status checks were empty. This is an observed configuration, not an instruction to bypass future protection.
 - GitHub Actions were enabled, default workflow token permissions read-only; no existing workflow runs/check runs, open PRs, repository deployments or configured repository environments were observed.
 - Repository Actions variables were empty, so the repository-level A06 enabling variable was **absent at inspection**. External Supabase/Vercel settings and any future configuration are **NOT VERIFIED**.
 
-The implementation and approved image are committed separately from A12/A13 at **`fe3e031c40047db99591b41c7199bc60487b3d38`** — **Add public-first authentication and My Nirmol**. This includes the final timeout fix and regression. Documentation is a separate follow-up commit. A staged-byte check verified all 26 implementation paths, valid UTF-8 text, blank environment examples, no credential-pattern matches and the exact approved image hash. No `.env` secret file, temporary screenshot, private user data or generated build output was staged. Push results will be recorded after actual remote verification.
+The implementation and approved image are committed separately from A12/A13 at **`fe3e031c40047db99591b41c7199bc60487b3d38`** — **Add public-first authentication and My Nirmol**. This includes the final timeout fix and regression. Documentation is separate at **`24a6bb82b6721b612213e1203e946f3a435a9d00`** — **Document authentication verification and team deployment boundaries**. A staged-byte check verified all 26 implementation paths, valid UTF-8 text, blank environment examples, no credential-pattern matches and the exact approved image hash. No `.env` secret file, temporary screenshot, private user data or generated build output was staged.
 
-Fetch again, inspect teammate divergence, run required tests against the actual proposed tree, and push normally to the approved feature branches. No force push, shared-history rewrite or branch deletion. **Do not merge or push `main`: the owner reserved integration for teammates.** They must independently verify deployment/migration safety and all applicable checks/reviews; missing external deployment evidence remains a blocker even when GitHub reports no branch protection.
+### Verified delivery receipt
+
+Destination: **`https://github.com/Tanisha-328/Nirmol.git`**. The actual command **`git push --atomic --set-upstream origin feature/personalization-advisor fix/air-forecast-reliability`** completed with **exit 0**, creating both approved remote branches and their upstream tracking. An independent subsequent `git ls-remote --heads origin` verified:
+
+| Remote ref | Verified implementation/documentation handoff hash |
+| --- | --- |
+| `feature/personalization-advisor` | `24a6bb82b6721b612213e1203e946f3a435a9d00` |
+| `fix/air-forecast-reliability` | `24a6bb82b6721b612213e1203e946f3a435a9d00` |
+| `main` — unchanged | `94c402e147be8de5d09416da6384c55565ab93c7` |
+| `feature/pollution-reporting` — unchanged | `94c402e147be8de5d09416da6384c55565ab93c7` |
+
+An authenticated, read-only post-push GitHub API snapshot at **2026-10-17 03:50:44 UTC** independently confirmed both feature refs above and unchanged `main`. It reported zero listed workflows, Actions runs and commit check runs for the inspected handoff commits, so **GitHub native Linux CI was NOT EXECUTED / NOT VERIFIED**. Repository Actions variables remained empty, including absence of the A06 enabling flag. No workflow was dispatched and no repository or external environment setting was changed. Supabase/Vercel settings remain unverified.
+
+This delivery receipt is a documentation-only follow-up to the verified handoff above. Its own Git object hash cannot be embedded in its own contents; obtain it with **`git log -1 --format=%H -- docs/team-handoff.md`**. Both feature branches receive the receipt through normal fast-forwards/pushes, with final exact remote tips reported after verification. No application or test file changes after `fe3e031` are part of this receipt.
+
+For an independent final-tip comparison, run `git ls-remote --heads origin refs/heads/feature/personalization-advisor refs/heads/fix/air-forecast-reliability refs/heads/main`, then compare the two feature hashes with local `git rev-parse HEAD`. Main must remain at the unchanged hash above for this handoff. The working tree was clean after the implementation/documentation commits; the final receipt is checked again before delivery.
+
+**Do not merge or push `main`: the owner reserved integration for teammates.** They must fetch current history, review these commits, test their actual integrated tree and independently verify deployment/migration safety and all applicable checks/reviews. Missing external deployment evidence remains a blocker even when GitHub reports no branch protection. No force push, shared-history rewrite or branch deletion is authorized.
 
 ## Deployment and demonstration checklist
 
