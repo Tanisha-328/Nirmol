@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAuthClient } from "@/lib/auth-server";
-import { getAuthConfig, hasTrustedOrigin, isAuthUnavailable } from "@/lib/auth";
+import { getAuthConfig, hasTrustedOrigin, isAuthUnavailable, readRequestBytes, RequestBodyError } from "@/lib/auth";
 import { emptyAccountSettings, parseAccountSettings, readAccountRow } from "@/lib/account";
 
 export const dynamic = "force-dynamic";
@@ -11,26 +11,12 @@ const respond = (body: unknown, status = 200) => NextResponse.json(body, {
 const unavailable = () => respond({ error: "persistence_unavailable" }, 503);
 
 async function readBody(request: Request): Promise<unknown> {
-  const reader = request.body?.getReader();
-  if (!reader) return null;
-  const chunks: Uint8Array[] = [];
-  let length = 0;
   try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      length += value.length;
-      if (length > 16_384) { await reader.cancel(); return null; }
-      chunks.push(value);
-    }
-    const bytes = new Uint8Array(length);
-    let offset = 0;
-    for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
+    const bytes = await readRequestBytes(request, 16_384);
     return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
-  } catch {
+  } catch (error) {
+    if (error instanceof RequestBodyError && error.code === "timeout") throw error;
     return null;
-  } finally {
-    reader.releaseLock();
   }
 }
 
@@ -52,9 +38,7 @@ export async function GET() {
     if (data === null) return respond({ userId: auth.user.id, settings: emptyAccountSettings() });
     const settings = readAccountRow(data, auth.user.id);
     return settings ? respond({ userId: auth.user.id, settings }) : unavailable();
-  } catch {
-    return unavailable();
-  }
+  } catch { return unavailable(); }
 }
 
 /** Compare-and-swap prevents an older tab from silently overwriting newer edits. */
@@ -83,7 +67,8 @@ export async function PUT(request: Request) {
     if (!data) return respond({ error: "revision_conflict" }, 409);
     const saved = readAccountRow(data, auth.user.id);
     return saved && saved.revision === settings.revision + 1 ? respond({ userId: auth.user.id, settings: saved }) : unavailable();
-  } catch {
-    return unavailable();
+  } catch (error) {
+    return error instanceof RequestBodyError && error.code === "timeout"
+      ? respond({ error: "request_timeout" }, 408) : unavailable();
   }
 }

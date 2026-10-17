@@ -1,7 +1,7 @@
 // Server-side air-quality data layer. Every value carries its source so the UI can
 // label it Measured / Model estimate / Demo. Missing values are null, never 0.
 
-import { inBangladesh, inDhakaModelArea, validCoordinates } from "./places";
+import { distanceKm, inBangladesh, inDhakaModelArea, validCoordinates } from "./places";
 import type { ForecastExplanation } from "./forecast-explanation";
 import { absoluteTime, forecastWindow, hasForecastInterval, isCompleteForecast, isFreshModelIssue,
   object, openMeteoTime, readCurrent, readForecast, readNirmolPublication, readWeather } from "./air-validation";
@@ -71,12 +71,25 @@ function units(value: unknown, expected: Record<string, string>): void {
   }
 }
 
-function readOpenMeteoAir(value: unknown, nowMs: number) {
+/** Reject contradictory provider grid metadata. 100km is a generous consistency
+ * bound around the requested point, not a claimed accuracy/resolution radius.
+ * Older responses without grid metadata retain explicitly unknown provenance.
+ */
+function checkProviderLocation(data: Record<string, unknown>, lat: number, lon: number) {
+  if (typeof data.latitude !== "number" || typeof data.longitude !== "number" ||
+      !validCoordinates(data.latitude, data.longitude)) return;
+  if (distanceKm(lat, lon, data.latitude, data.longitude) > 100) {
+    throw new Error("Environmental provider grid does not match requested area");
+  }
+}
+
+function readOpenMeteoAir(value: unknown, nowMs: number, lat: number, lon: number) {
   const data = object(value);
   const current = object(data?.current);
   const hourly = object(data?.hourly);
   if (!data || !current || !hourly || !Array.isArray(hourly.time) || !Array.isArray(hourly.pm2_5) ||
       hourly.time.length !== hourly.pm2_5.length) throw new Error("Malformed air provider response");
+  checkProviderLocation(data, lat, lon);
   units(data.current_units, { time: "iso8601", pm2_5: "µg/m³" });
   units(data.hourly_units, { time: "iso8601", pm2_5: "µg/m³" });
   const readings = hourly.pm2_5;
@@ -88,10 +101,11 @@ function readOpenMeteoAir(value: unknown, nowMs: number) {
   };
 }
 
-function readOpenMeteoWeather(value: unknown): AirReport["weather"] {
+function readOpenMeteoWeather(value: unknown, lat: number, lon: number): AirReport["weather"] {
   const data = object(value);
   const current = object(data?.current);
   if (!data || !current) throw new Error("Malformed weather provider response");
+  checkProviderLocation(data, lat, lon);
   units(data.current_units, { time: "iso8601", temperature_2m: "°C", relative_humidity_2m: "%", wind_speed_10m: "km/h" });
   return readWeather({ time: openMeteoTime(current.time), temperature: current.temperature_2m,
     humidity: current.relative_humidity_2m, windSpeed: current.wind_speed_10m });
@@ -100,9 +114,11 @@ function readOpenMeteoWeather(value: unknown): AirReport["weather"] {
 /** Bounded recovery: validate original publications, then operational coverage. */
 async function latestNirmolForecast(signal?: AbortSignal): Promise<{ points: ForecastPoint[]; issuedAt: string } | null> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !key) return null;
-  const headers = { apikey: key, Authorization: `Bearer ${key}` };
+  // New opaque publishable keys go only in apikey; they are not bearer JWTs.
+  const headers: Record<string, string> = { apikey: key };
+  if (!key.startsWith("sb_publishable_")) headers.Authorization = `Bearer ${key}`;
   try {
     const requestedAt = Date.now();
     const query = new URLSearchParams({
@@ -138,11 +154,11 @@ export async function getAirReport(lat: number, lon: number, signal?: AbortSigna
   const dhaka = inDhakaModelArea(lat, lon);
   const [air, weather, model] = await Promise.all([
     getJson(`https://air-quality-api.open-meteo.com/v1/air-quality?${q}&current=pm2_5&hourly=pm2_5&forecast_days=2`, signal)
-      .then((data) => readOpenMeteoAir(data, Date.now())).catch(() => null),
+      .then((data) => readOpenMeteoAir(data, Date.now(), lat, lon)).catch(() => null),
     getJson(
       `https://api.open-meteo.com/v1/forecast?${q}&current=temperature_2m,relative_humidity_2m,wind_speed_10m`,
       signal,
-    ).then(readOpenMeteoWeather).catch(missingWeather),
+    ).then(data => readOpenMeteoWeather(data, lat, lon)).catch(missingWeather),
     dhaka ? latestNirmolForecast(signal) : Promise.resolve(null),
   ]);
   if (signal?.aborted) throw new Error("Air request cancelled");

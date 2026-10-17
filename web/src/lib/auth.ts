@@ -9,6 +9,44 @@ export const AUTH_PRIVATE_HEADERS = {
   "X-Content-Type-Options": "nosniff",
 };
 
+export class RequestBodyError extends Error {
+  constructor(public code: "invalid" | "too-large" | "timeout") { super(code); }
+}
+
+/** Bound bytes AND elapsed time, even when Content-Length is absent or false.
+ * Cancellation is fire-and-forget: an uncooperative stream cannot hold the deadline.
+ */
+export async function readRequestBytes(request: Request, limit: number): Promise<Uint8Array> {
+  const reader = request.body?.getReader();
+  if (!reader) throw new RequestBodyError("invalid");
+  let timer: ReturnType<typeof setTimeout>;
+  let cancel: () => void = () => {};
+  const deadline = new Promise<never>((_, reject) => {
+    cancel = () => { void reader.cancel().catch(() => {}); reject(new RequestBodyError("timeout")); };
+    timer = setTimeout(cancel, 8000);
+    request.signal.addEventListener("abort", cancel, { once: true });
+    if (request.signal.aborted) cancel();
+  });
+  try {
+    return await Promise.race([deadline, (async () => {
+      const chunks: Uint8Array[] = []; let size = 0;
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        size += value.byteLength;
+        if (size > limit) { void reader.cancel().catch(() => {}); throw new RequestBodyError("too-large"); }
+        chunks.push(value);
+      }
+      const bytes = new Uint8Array(size); let offset = 0;
+      for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+      return bytes;
+    })()]);
+  } finally {
+    clearTimeout(timer!); request.signal.removeEventListener("abort", cancel);
+    try { reader.releaseLock(); } catch { /* cancelled pending read can still be settling */ }
+  }
+}
+
 function configuredOrigin(value: string | undefined): string | null {
   if (!value || value !== value.trim()) return null;
   try {

@@ -1,5 +1,56 @@
 # Nirmol team handoff
 
+**Phase 05B partial real-service verification, 18 October 2026 (Asia/Dhaka):**
+HEAD remains `a85a824b15af8ee4de49d04749f504560e358bf3`, branch
+`fix/location-reliability`. Phase 05A was **not committed**; its 18 files were
+preserved. The owner prohibited access to the existing Supabase project and
+declined live Gemini. No disposable target or Docker/Podman/psql/Supabase CLI was
+available. Real SDK result: **0 passed, 0 failed, 3 skipped**; no SQL/migration,
+Auth identity or Storage operation ran. RLS/concurrency remain unverified.
+
+One actual public production HTTP/browser read passed without air-response mocks:
+Dhaka city reference, 17 Oct 21:08 UTC, CAMS 78.7 µg/m³ valid 21:00, 25 forecast
+hours, weather and forecast explanation navigation. This is regional modeled
+information; ordinary production cache can apply. No live AI request occurred.
+Fresh deterministic regression: **449 web + 321 browser + 55 Python = 825 passed,
+zero failed**; 44 axe states, zero automated violations/overflow, 12 manual groups.
+TypeScript, strict ESLint, production build, native SHAP and whitespace pass.
+Five HIGH dev dependency findings remain. No new application P0/P1 was reproduced.
+
+See [05B evidence, exact receipts and release gates](phase05b-real-service-verification.md)
+and [Windows local disposable setup, not executed](phase05b-local-supabase-setup.md).
+WSL/resources make local setup plausible after prerequisites; Docker execution
+and virtualization remain unproven. The guide excludes 0002 and preserves honest
+separate local migration history. Combined tree: **21 unstaged files (11 modified,
+10 new)**, empty index. No commit, push, deploy, hosted change or A06 activation.
+Next is synthetic real-DB/staging validation; full real-user/funded operational
+pilot readiness remains unestablished.
+
+**Phase 05A independent audit, 18 October 2026 (Asia/Dhaka):** started clean on
+`fix/location-reliability` at `a85a824b15af8ee4de49d04749f504560e358bf3` (Phase 04
+committed). Independent tests reproduced provider-coordinate, public-key selection,
+slow-body, calendar, rolling-history and accessibility defects; local fixes preserve
+existing features. One actual public CAMS/weather read at Baridhara succeeded;
+hosted Auth, real database/RLS/Storage/quota and live Gemini remain unverified.
+**The complete product is not ready for an unrestricted real-user pilot.** See
+[the independent audit](independent-product-audit.md),
+[graded feature evidence](feature-evidence-matrix.md) and
+[real-world validation gates](real-world-validation-plan.md). Final receipts and
+the complete inventory are in the audit. No migration, workflow, model artifact,
+approved Auth background, index, commit, push, deployment or A06 activation occurred.
+The five HIGH development dependency advisories remain open.
+
+Final Phase 05A regression: **449 web + 321 browser + 55 Python = 825 passed,
+zero failed**; three real Supabase SDK suites skipped. All eleven browser suites
+pass. Forty-four axe states have zero automated violations/overflow, with 12
+manual-review groups retained. TypeScript, strict zero-warning ESLint, native
+XGBoost/SHAP smoke, fresh production build and whitespace checks pass. The resumed
+review narrowed the history guard to its required 49 hours and proved irrelevant
+old/future gaps preserve identical results. The apparent redirect-language failure
+was the new test blocking the owned server's localhost alias, not an i18n defect.
+Eighteen files remain unstaged (11 modified, 7 new). Controlled staging validation
+is the next phase; a full real-user pilot/production-readiness claim is not ready.
+
 **Phase 04 local follow-up, 18 October 2026 (Asia/Dhaka):** verified Phase 03
 committed at `1ac5bd2e840e91d4708016f380acf021ec31824f` on
 `fix/location-reliability`, with a clean starting tree/index. F08 now has the public

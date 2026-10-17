@@ -8,7 +8,7 @@
   --soft: #e8f0f1;
   --border: #d6e0e3;
   --muted: #5b6b7c;
-  --accent: #0f8b8d;
+  --accent: #0b686b;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -44,7 +44,8 @@ body {
   .dashboard { --accent: #5ed6d2; }
 }
 
-.dashboard .dashboard-primary {
+/* Shared action colour also covers selected controls outside the dashboard. */
+.dashboard-primary {
   color: #ffffff;
   background: #0b686b;
 }

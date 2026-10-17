@@ -137,11 +137,12 @@ export function calculateExposure(pm25: number, profile: ExposureProfile): Expos
  */
 export function isUsableCurrentEstimate(time: string, nowMs: number = Date.now()): boolean {
   if (typeof time !== "string" || !Number.isFinite(nowMs)) return false;
-  const absoluteIsoTime = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})$/;
+  const absoluteIsoTime = /^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$/;
   if (!absoluteIsoTime.test(time)) return false;
 
   const timestamp = Date.parse(time);
-  if (!Number.isFinite(timestamp)) return false;
+  const day = Date.parse(`${time.slice(0, 10)}T00:00:00Z`);
+  if (!Number.isFinite(timestamp) || !Number.isFinite(day) || new Date(day).toISOString().slice(0, 10) !== time.slice(0, 10)) return false;
   const ageMs = nowMs - timestamp;
   return ageMs >= 0 && ageMs <= MAX_CURRENT_AGE_MS;
 }

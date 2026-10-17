@@ -69,12 +69,21 @@ def build_forecast() -> tuple[pd.DataFrame, dict, str]:
     raw = open_meteo("https://air-quality-api.open-meteo.com/v1/air-quality", CAMS_VARS, "cams_").join(
         open_meteo("https://api.open-meteo.com/v1/forecast", WEATHER_VARS, ""), how="inner"
     )
+    issued_at = datetime.now(timezone.utc).isoformat()
+    start = pd.Timestamp(issued_at).tz_convert(None).floor("h")
+    # Only the 24 prior hours and intended 25 target hours affect these models.
+    # Reject gaps/order/duplicates within that window without sorting or filling;
+    # unrelated older or later provider gaps must not block a valid forecast.
+    if not isinstance(raw.index, pd.DatetimeIndex) or raw.index.hasnans:
+        raise ValueError("Provider history must be an ordered, continuous hourly grid; not publishing.")
+    required = pd.date_range(start - pd.Timedelta(hours=24), periods=24 + HOURS, freq="h")
+    raw = raw.loc[(raw.index >= required[0]) & (raw.index <= required[-1])]
+    if not raw.index.equals(required):
+        raise ValueError("Provider history must be an ordered, continuous hourly grid; not publishing.")
     X = add_features(raw)
     if list(X.columns) != list(FEATURES):
         raise RuntimeError("Preprocessing feature order differs from the saved-model contract.")
 
-    issued_at = datetime.now(timezone.utc).isoformat()
-    start = pd.Timestamp(issued_at).tz_convert(None).floor("h")
     if not X.index.is_unique:
         raise ValueError("Duplicate forecast input hours; not publishing.")
     # Missing target hours must fail, rather than shifting later hours into them.

@@ -1,3 +1,34 @@
+# Phase 05A independent audit
+
+The full runner now includes eleven suites, ending in
+`independent-audit.browser.mjs`; receipts use `%TEMP%/nirmol-05a-regression-*.log`.
+For development only, its third argument `--independent-audit-only` explicitly runs
+just the three new browser tests; this is not a complete regression receipt.
+
+`independent-audit.test.mjs` adds separate arithmetic/location oracles, actual
+Auth/account slow-stream handlers, provider-location/key tests and real sharp
+metadata stripping. `jobs/tests/test_independent_science_audit.py` adds scalar
+feature checks, actual saved-model SHAP additivity, required-history failures and
+identical predictions when only unused old/future provider hours have gaps.
+These synthetic inputs establish no forecast accuracy.
+
+The new browser suite uses actual production DOM/navigation, deterministic client
+air, real unconfigured private HTTP failures and axe-core on 44 page/language/theme
+states. It retains incomplete/manual review results in JSON. It does not establish
+real PostgreSQL/RLS, live Gemini, phone or screen-reader behavior. No new dependency
+was installed; axe-core is already present.
+
+The audit browser permits only the owned port 3001 at `127.0.0.1`/`localhost`;
+Next's middleware can redirect between these loopback aliases. Remote requests
+remain blocked. Run TypeScript after a completed build, never concurrently with
+the build replacing `.next/types`.
+
+The separate `web/scripts/audit-public-air.mjs` makes two real public Open-Meteo
+reads only with `NIRMOL_05A_PUBLIC_AIR=allow-public-reference-read`. It clears
+Supabase/Gemini configuration in its process and cannot publish. It is not part of
+offline regressions. Read the three Phase 05A audit/evidence/validation documents
+for exact scope; skipped real SDK suites are not security passes.
+
 # Phase 04 F08 advisor
 
 Run the same full unit/type/lint/build and browser commands below. The browser

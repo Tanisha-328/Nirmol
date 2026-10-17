@@ -282,7 +282,7 @@ export function ExposureCalculator() {
           {(["current", "scenario"] as const).map((nextMode) => (
             <button key={nextMode} type="button" onClick={() => setMode(nextMode)}
               aria-pressed={mode === nextMode}
-              className={`min-h-12 rounded-xl px-3 text-sm font-semibold ${FOCUS_STYLE} ${mode === nextMode ? "bg-[var(--accent)] text-white" : "border border-[var(--border)]"}`}>
+              className={`min-h-12 rounded-xl px-3 text-sm font-semibold ${FOCUS_STYLE} ${mode === nextMode ? "dashboard-primary" : "border border-[var(--border)]"}`}>
               {nextMode === "current" ? t.current : t.scenario}
             </button>
           ))}

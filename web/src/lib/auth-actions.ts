@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { AUTH_PRIVATE_HEADERS, authError, getAuthConfig, hasRecoveryClaim, hasTrustedOrigin,
-  isAuthUnavailable, safeRedirect, validEmail, validPassword, type AuthConfig } from "./auth";
+  isAuthUnavailable, safeRedirect, validEmail, validPassword, readRequestBytes, RequestBodyError, type AuthConfig } from "./auth";
 
 type Client = Pick<SupabaseClient, "auth">;
 type Dependencies = { config: AuthConfig | null; createClient: () => Promise<Client> };
@@ -37,25 +37,14 @@ export async function handleAuthPost(request: Request, { config, createClient }:
     (length && (!/^\d+$/.test(length) || Number(length) > 4096))) return authJson({ error: "invalid-request" }, 400);
   let body: Record<string, unknown>;
   try {
-    // Bound the stream as well as Content-Length (which may be absent/false).
-    const reader = request.body?.getReader();
-    if (!reader) return authJson({ error: "invalid-request" }, 400);
-    const chunks: Uint8Array[] = [];
-    let size = 0;
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      size += value.byteLength;
-      if (size > 4096) { await reader.cancel(); return authJson({ error: "invalid-request" }, 400); }
-      chunks.push(value);
-    }
-    const bytes = new Uint8Array(size);
-    let offset = 0;
-    chunks.forEach((part) => { bytes.set(part, offset); offset += part.length; });
+    const bytes = await readRequestBytes(request, 4096);
     const parsed: unknown = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return authJson({ error: "invalid-request" }, 400);
     body = parsed as Record<string, unknown>;
-  } catch { return authJson({ error: "invalid-request" }, 400); }
+  } catch (error) {
+    return error instanceof RequestBodyError && error.code === "timeout"
+      ? authJson({ error: "request-timeout" }, 408) : authJson({ error: "invalid-request" }, 400);
+  }
   const action = body.action;
   if (typeof action !== "string" || !["sign-in", "sign-up", "reset-password", "update-password", "sign-out"].includes(action)) return authJson({ error: "invalid-request" }, 400);
   if (["sign-in", "sign-up", "reset-password"].includes(action) && !validEmail(body.email)) return authJson({ error: "invalid-email" }, 400);
