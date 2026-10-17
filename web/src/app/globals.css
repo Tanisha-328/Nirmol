@@ -57,3 +57,9 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .dashboard .animate-pulse { animation: none; }
 }
+
+.account-page :is(button, select, input, a):focus-visible {
+  outline: 3px solid var(--foreground);
+  outline-offset: 3px;
+}
+.account-page .account-primary { background: #12573f; color: #fff; }

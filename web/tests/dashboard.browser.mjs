@@ -240,7 +240,7 @@ test("A09 hour selection survives source details and language changes with trans
   await forecastHour().selectOption(data.forecast[1].time);
   await page.getByRole("button", { name: "Where does this come from?", exact: true }).click();
   assert.equal(await forecastHour().inputValue(), data.forecast[1].time);
-  await page.getByRole("button", { name: "Switch language", exact: true }).click();
+  await page.getByRole("button", { name: "Switch language: বাংলা", exact: true }).click();
   assert.equal(await forecastHour().inputValue(), data.forecast[1].time);
   assert.match(await explanation().innerText(), /বাতাস|বায়ু/);
   assert.doesNotMatch(await explanation().innerText(), /Wind speed|Cloud cover|Air temperature/);
@@ -415,7 +415,7 @@ test("A11 category and provenance badges and location text meet contrast in both
 test("A11 SHAP, action links and keyboard focus work at 320px, tablet and desktop in both languages and themes", async () => {
   await open(); await finish(0, explainedReport()); await pm("20");
   for (const lang of ["en", "bn"]) {
-    if (lang === "bn") await page.getByRole("button", { name: "Switch language", exact: true }).click();
+    if (lang === "bn") await page.getByRole("button", { name: "Switch language: বাংলা", exact: true }).click();
     for (const colorScheme of ["light", "dark"]) for (const width of [320, 768, 1280]) {
       await page.emulateMedia({ colorScheme, reducedMotion: "reduce" }); await page.setViewportSize({ width, height: 900 }); await settle();
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, `${lang}/${colorScheme}/${width} has no horizontal overflow`);
@@ -576,7 +576,7 @@ test("valid zero, bilingual labels, 320px layouts and keyboard focus survive the
     await page.setViewportSize({ width, height: 900 });
     await page.goto(baseURL); await started(1);
     await finish(0, { now: { ...fixture(baseURL).now, pm25: 0 } }); await pm("0");
-    if (lang === "bn") await page.getByRole("button", { name: "Switch language", exact: true }).click();
+    if (lang === "bn") await page.getByRole("button", { name: "Switch language: বাংলা", exact: true }).click();
     assert.equal(await page.locator("html").getAttribute("lang"), lang);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
     await page.locator("body").click({ position: { x: 1, y: 1 } }); await page.keyboard.press("Tab");
@@ -631,7 +631,7 @@ test("A07 issuance, valid-time coverage and retrieval are distinct and shown in 
   assert.ok(await forecastCard().locator(`time[datetime="${data.forecast[0].time}"]`).count());
   assert.ok(await forecastCard().locator(`time[datetime="${data.forecast.at(-1).time}"]`).count());
   assert.ok(await page.locator(`time[datetime="${issuedAt}"]`).count());
-  await page.getByRole("button", { name: "Switch language", exact: true }).click();
+  await page.getByRole("button", { name: "Switch language: বাংলা", exact: true }).click();
   assert.match(await page.locator("main").innerText(), /মডেল প্রকাশ|তথ্য আনা|পূর্বাভাসের সময়সীমা/);
 });
 test("A07 Feature 03 drops current estimates when their model issuance expires", async () => {
