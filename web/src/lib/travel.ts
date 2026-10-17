@@ -1,4 +1,5 @@
 import type { AirReport, ForecastPoint } from "./air";
+import { inBangladesh, inDhakaModelArea } from "./places";
 import {
   calculateExposure, isValidConcentration,
   type ExposureProfile, type ExposureResult,
@@ -46,6 +47,8 @@ export function isFreshTravelReport(report: TravelAir, nowMs: number): boolean {
 export function readTravelAir(value: unknown, location: { lat: number; lon: number }, nowMs: number): TravelAir {
   if (!value || typeof value !== "object") throw new Error("Missing forecast report");
   const data = value as Record<string, unknown>;
+  if (!inBangladesh(location.lat, location.lon)) throw new Error("Location must be in Bangladesh");
+  if (data.forecastSource === "nirmol" && !inDhakaModelArea(location.lat, location.lon)) throw new Error("Custom model outside evaluated reference");
   if (typeof data.lat !== "number" || typeof data.lon !== "number" ||
       !Number.isFinite(data.lat) || !Number.isFinite(data.lon) ||
       data.lat !== location.lat || data.lon !== location.lon ||

@@ -64,6 +64,40 @@ test("05C parent scenario preserves the arithmetic while explaining provisional 
   assert.equal(await page.locator("#hours-error").getAttribute("aria-live"), "polite");
 });
 
+test("05D exposure rejects custom-model JSON outside the evaluated reference without breaking CAMS or hypothetical use", async () => {
+  let source = "nirmol";
+  await page.route("**/api/air?*", route => {
+    const q = new URL(route.request().url()).searchParams;
+    return route.fulfill({ json: { lat: Number(q.get("lat")), lon: Number(q.get("lon")),
+      now: { pm25: 80, kind: "model_estimate", source, time: new Date().toISOString() } } });
+  });
+  await page.goto(`${base}/exposure`);
+  await page.getByText("Could not load the air-quality data.", { exact: true }).first().waitFor();
+  assert.equal(await page.getByText("240.0", { exact: true }).count(), 0);
+  await page.getByRole("button", { name: "Hypothetical scenario", exact: true }).click();
+  await page.getByText("240.0", { exact: true }).waitFor();
+  source = "cams";
+  await page.getByRole("button", { name: "Current air-quality estimate", exact: true }).click();
+  await page.getByRole("button", { name: "Refresh data", exact: true }).click();
+  await page.getByText("240.0", { exact: true }).waitFor();
+  assert.match(await page.locator("main").innerText(), /CAMS model estimate \(not a measurement\)/);
+});
+
+test("05D native date controls follow the active light/dark theme across public tools", async () => {
+  for (const scheme of ["dark", "light"]) {
+    await page.emulateMedia({ colorScheme: scheme });
+    for (const path of ["/travel", "/community", "/diary", "/simulator"]) {
+      await page.goto(`${base}${path}`);
+      if (path === "/simulator") await page.getByRole("button", { name: "Forecast departures", exact: true }).click();
+      const inputs = page.locator('input[type="date"],input[type="datetime-local"]');await inputs.first().waitFor();
+      const schemes = await inputs.evaluateAll(fields => fields.map(el => getComputedStyle(el).colorScheme));
+      assert.ok(schemes.every(value => value.split(" ").includes(scheme)), `${path}: browser must render ${scheme} native date controls; got ${schemes}`);
+      assert.ok(await inputs.first().isEnabled(), "theme styling must not disable native date entry");
+      await inputs.first().focus();assert.equal(await inputs.first().evaluate(el => el === document.activeElement), true);
+    }
+  }
+});
+
 test("05C dashboard language changes preserve navigation height and focus", async () => {
   await page.setViewportSize({ width: 768, height: 900 }); await page.goto(base);
   await page.getByRole("combobox", { name: "Forecast hour", exact: true }).waitFor();
@@ -146,7 +180,8 @@ test("05C responsive axe, keyboard focus, reduced-motion and layout-shift observ
       const focused = await page.evaluate(() => { const el = document.activeElement, style = el && getComputedStyle(el); return { tag: el?.tagName, visible: el?.matches(":focus-visible"), outline: style?.outlineStyle }; });
       receipts.push({ width, lang, scheme, path, focused, clsBeforeAxe, ...result });
       if (result.violations.length || result.overflow || !result.reducedMotion || focused.tag === "BODY") failures.push({ width, lang, scheme, path, violations: result.violations, overflow: result.overflow, focused });
-      if (["/", "/community", "/advisor", "/exposure"].includes(path) && lang === "bn" && scheme === "dark") await page.screenshot({ path: join(directory, `${path === "/" ? "dashboard" : path.slice(1)}-${width}-bn-dark.png`), fullPage: true });
+      // Retain every route/language/theme/width for the independent 05D visual review.
+      await page.screenshot({ path: join(directory, `${path === "/" ? "dashboard" : path.slice(1)}-${width}-${lang}-${scheme}.png`), fullPage: true });
     }
   }
   await writeFile(join(directory, "responsive-receipts.json"), JSON.stringify(receipts, null, 2));

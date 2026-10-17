@@ -155,6 +155,7 @@ test("unknown sources, wrong locations, duplicate and malformed forecast times f
 });
 
 test("HTTP and invalid JSON errors recover on refresh and Nirmol is labelled as a model", async () => {
+  await context.addInitScript(() => localStorage.setItem("nirmol.loc", JSON.stringify({ lat: 23.796374, lon: 90.424614, placeId: "dhaka-reference" })));
   let attempt = 0;
   await page.route("**/api/air?*", (route) => {
     attempt++;

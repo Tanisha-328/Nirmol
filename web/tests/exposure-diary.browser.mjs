@@ -274,7 +274,10 @@ test("simultaneous persistent edits serialize; the losing tab retains its draft 
   await field("Plain-text notes (optional)").fill("fictional first edit"); await other.getByLabel("Plain-text notes (optional)", { exact: true }).fill("fictional second edit");
   // Hold the actual browser lock until both form submissions have queued.
   await page.evaluate((key) => new Promise((ready) => { void navigator.locks.request(key, () => new Promise((release) => { window.releaseDiaryAuditLock = release; ready(); })); }), KEY);
-  await save(); await other.getByRole("button", { name: "Update activity", exact: true }).click();
+  // Foreground each tab and use the keyboard; the first tab's test clock is paused.
+  await page.bringToFront(); await form().getByRole("button", { name: "Update activity", exact: true }).focus(); await page.keyboard.press("Enter");
+  await other.bringToFront(); await other.getByRole("button", { name: "Update activity", exact: true }).focus(); await other.keyboard.press("Enter");
+  await other.waitForFunction(async key => (await navigator.locks.query()).pending.filter(lock => lock.name === key).length === 2, KEY);
   await page.evaluate(() => window.releaseDiaryAuditLock()); await saved(); await other.getByText(/The saved diary changed in another tab/).waitFor();
   assert.equal(JSON.parse((await snapshot()).local).entries[0].notes, "fictional first edit");
   assert.equal(await other.getByLabel("Plain-text notes (optional)", { exact: true }).inputValue(), "fictional second edit");

@@ -91,6 +91,7 @@ test("zero PM2.5 is valid and source/time are shown", async () => {
 });
 
 test("supported model sources have consistent labels; contradictory measured sources fail closed", async () => {
+  await context.addInitScript(() => localStorage.setItem("nirmol.loc", JSON.stringify({ lat: 23.796374, lon: 90.424614, placeId: "dhaka-reference" })));
   let current = {};
   await page.route("**/api/air?*", (route) => route.fulfill({ json: fixture(route.request().url(), current) }));
   for (const source of ["cams", "nirmol"]) {

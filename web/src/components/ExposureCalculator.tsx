@@ -20,7 +20,7 @@ import {
   type Sensitivity,
 } from "@/lib/exposure";
 import { useI18n } from "@/lib/i18n";
-import { PLACES, nearestPlace } from "@/lib/places";
+import { PLACES, nearestPlace, inDhakaModelArea } from "@/lib/places";
 
 const WORDS = {
   en: {
@@ -102,6 +102,7 @@ function readCurrentAir(value: unknown, location: Location): CurrentAir {
     throw new Error("Air report does not match the requested location");
   }
   const current = data.now as Record<string, unknown>;
+  if (current.source === "nirmol" && !inDhakaModelArea(location.lat, location.lon)) throw new Error("Custom model outside evaluated reference");
   if (typeof current.time !== "string" ||
       (current.pm25 !== null && !isValidConcentration(current.pm25)) ||
       (current.kind !== "measured" && current.kind !== "model_estimate" && current.kind !== "demo") ||

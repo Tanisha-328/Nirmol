@@ -115,6 +115,7 @@ test("current comparisons show their model source and absolute timestamps", asyn
 });
 
 test("a real zero current reading stays zero and is not replaced with forecast data", async () => {
+  await context.addInitScript(() => localStorage.setItem("nirmol.loc", JSON.stringify({ lat: 23.796374, lon: 90.424614, placeId: "dhaka-reference" })));
   const current = { pm25: 0, time: new Date(now).toISOString(), kind: "model_estimate", source: "nirmol" };
   await mock(Array(25).fill(900), { now: current }); await open(); await mode("Current estimate"); await result("0.0", "0.0");
   assert.match(await page.getByTestId("percent-change").innerText(), /Percentage unavailable/);
@@ -159,6 +160,7 @@ test("forecast gaps, missing values and terminal boundaries withhold both result
 });
 
 test("forecast departures cross midnight in Dhaka even with a New York browser timezone", async () => {
+  await context.addInitScript(() => localStorage.setItem("nirmol.loc", JSON.stringify({ lat: 23.796374, lon: 90.424614, placeId: "dhaka-reference" })));
   await mock(undefined, { forecastSource: "nirmol" }); await open(); await mode("Forecast departures");
   for (const name of ["Baseline", "What-if"]) await group(name).getByLabel("Hours outdoors", { exact: true }).fill("1.5");
   await group("Baseline").getByLabel("Departure (Bangladesh time)", { exact: true }).fill("2026-10-16T23:30");

@@ -8,7 +8,12 @@ async function moduleUrl(path, replacements = {}) {
   let source = await readFile(new URL(path, import.meta.url), "utf8");
   for (const [from, to] of Object.entries(replacements)) source = source.replaceAll(`"${from}"`, `"${to}"`);
   const { outputText } = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2020 } });
-  return `data:text/javascript;base64,${Buffer.from(outputText).toString("base64")}`;
+  let code = outputText;
+  for (const match of [...code.matchAll(/from ["'](\.[^"']+)["']/g)]) {
+    const dependency = new URL(`${match[1]}.ts`, new URL(path, import.meta.url));
+    code = code.replace(match[0], `from ${JSON.stringify(await moduleUrl(dependency))}`);
+  }
+  return `data:text/javascript;base64,${Buffer.from(code).toString("base64")}`;
 }
 const exposureUrl = await moduleUrl("../src/lib/exposure.ts");
 const { calculateExposure } = await import(exposureUrl);
@@ -132,7 +137,8 @@ test("invalid durations, profiles, windows and ambiguous forecast timestamps fai
   assert.equal(sorted.options[0].indicator, 10);
 });
 
-const location = { lat: 23.7808, lon: 90.4067 };
+// Positive custom-model fixtures must use the evaluated reference, not city centre.
+const location = { lat: 23.796374, lon: 90.424614 };
 const report = () => ({ ...location, forecast: forecast([10, 20, 30]), forecastSource: "cams", fetchedAt: new Date(start).toISOString(), now: { kind: "measured", source: "unknown" } });
 
 test("forecast and fetchedAt timestamps require explicit zones in every runtime timezone", () => {

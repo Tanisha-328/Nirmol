@@ -652,6 +652,7 @@ test("A07 issuance, valid-time coverage and retrieval are distinct and shown in 
   assert.match(await page.locator("main").innerText(), /মডেল প্রকাশ|তথ্য আনা|পূর্বাভাসের সময়সীমা/);
 });
 test("A07 Feature 03 drops current estimates when their model issuance expires", async () => {
+  await reference();
   await page.goto(`${baseURL}/exposure`); await started(1);
   const issuedAt = new Date(now - 3 * 3_600_000 + 60_000).toISOString();
   await finish(0, { now: { ...fixture(baseURL).now, source: "nirmol", issuedAt } });
@@ -688,7 +689,7 @@ test("A07 Feature 14 cannot refresh expired current or forecast issuance with a 
   assert.equal(await page.getByTestId("comparison").count(), 0);
 });
 test("A07 Feature 09 cannot save a current snapshot after its model expires", async () => {
-  await page.goto(`${baseURL}/diary`); await page.getByLabel("PM2.5 source", { exact: true }).selectOption("current"); await started(1);
+  await page.goto(`${baseURL}/diary`); await page.getByLabel("Bangladesh location", { exact: true }).selectOption("dhaka-reference"); await page.getByLabel("PM2.5 source", { exact: true }).selectOption("current"); await started(1);
   const issuedAt = new Date(now - 3 * 3_600_000 + 60_000).toISOString();
   await finish(0, { now: { ...fixture(baseURL).now, source: "nirmol", issuedAt } });
   await page.getByTestId("diary-preview").waitFor();

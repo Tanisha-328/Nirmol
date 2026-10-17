@@ -35,6 +35,11 @@ body {
   font-family: var(--font-inter), var(--font-bengali), system-ui, sans-serif;
 }
 
+/* Match browser-owned calendar buttons/popovers to the themed date fields. */
+input:is([type="date"], [type="datetime-local"]) {
+  color-scheme: light dark;
+}
+
 /* Dashboard-only contrast and focus fixes; other feature palettes stay intact. */
 .dashboard {
   --accent: #0b686b;

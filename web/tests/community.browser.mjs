@@ -101,6 +101,20 @@ async function openMod(){await page.goto(`${base}/moderation`);await page.getByR
 const reviewButton=()=>page.getByRole("button",{name:"Review report",exact:true});
 async function inspect(){await reviewButton().first().click();await page.getByRole("heading",{name:"Private incident review",exact:true}).waitFor();}
 const postReview=(ctx,e,id=M,decision="approve",revision=0)=>ctx.request.post(`${base}/api/reports/moderation`,{headers:{origin:base,"x-expected-user":id},data:{id:e.report.id,decision,reason:"Synthetic observation reviewed carefully",revision}});
+test("05D keyboard moderation focuses visible details and returns to its queue after close/save",async()=>{
+  const e=seed(A);await login(M);await openMod();
+  const open=reviewButton().first();await open.focus();await page.keyboard.press("Enter");
+  const detail=page.getByTestId("moderation-detail");await detail.getByRole("heading",{name:"Private incident review",exact:true}).waitFor();
+  assert.equal(await detail.evaluate(el=>el===document.activeElement),true,"focus must move after the private panel becomes visible");
+  const tabTo=async locator=>{for(let i=0;i<60;i++){if(await locator.evaluate(el=>el===document.activeElement))return;await page.keyboard.press("Tab");}assert.fail("Keyboard could not reach review control");};
+  await tabTo(page.getByRole("button",{name:"Close private details",exact:true}));await page.keyboard.press("Enter");
+  assert.equal(await page.getByRole("region",{name:"Review queue",exact:true}).evaluate(el=>el===document.activeElement),true,"closing details must keep focus in the visible review queue");
+  await tabTo(reviewButton().first());await page.keyboard.press("Enter");await detail.waitFor({state:"visible"});
+  await tabTo(page.getByLabel(/^Decision reason/));await page.keyboard.insertText("Synthetic keyboard review confirms public eligibility");
+  await tabTo(page.getByRole("button",{name:"Approve report",exact:true}));await page.keyboard.press("Enter");await page.getByText(/^Decision saved/).waitFor();
+  assert.equal(e.report.status,"approved");assert.equal(e.reviews[0].reviewerId,M);
+  assert.equal(await page.getByRole("region",{name:"Review queue",exact:true}).evaluate(el=>el===document.activeElement),true,"saving/removing a report must not lose keyboard focus");
+});
 test("public map is usable without login, empty data or tile service and makes no Auth/tile calls",async()=>{
   await openMap();await page.getByText(/^No approved reports match/).waitFor();assert.equal(await page.locator(".community-marker").count(),0);assert.ok(state.requests.some(r=>r.path.endsWith("f06_public_reports")));assert.ok(!state.requests.some(r=>r.path==="/auth/v1/user"));
   assert.equal(await page.getByRole("link",{name:"Report an observation / My reports"}).getAttribute("href"),"/reports");

@@ -3,7 +3,7 @@ import {
   calculateExposure, isUsableCurrentEstimate, isValidConcentration,
   type ExposureProfile, type ExposureResult,
 } from "./exposure";
-import { inBangladesh } from "./places";
+import { inBangladesh, inDhakaModelArea } from "./places";
 import { planTravel, readTravelAir } from "./travel";
 
 export type SimulatorPerson = Pick<ExposureProfile, "ageGroup" | "sensitivities">;
@@ -81,6 +81,7 @@ export function readSimulatorCurrent(value: unknown, location: SimulatorLocation
       !data.now || typeof data.now !== "object" || typeof data.fetchedAt !== "string" ||
       !freshFetch(data.fetchedAt, receivedAtMs)) throw new Error("Invalid current provenance or location");
   const current = data.now as Record<string, unknown>;
+  if (current.source === "nirmol" && !inDhakaModelArea(location.lat, location.lon)) throw new Error("Custom model outside evaluated reference");
   if (current.kind !== "model_estimate" || (current.source !== "cams" && current.source !== "nirmol") ||
       (current.issuedAt !== undefined && (current.source !== "nirmol" || typeof current.issuedAt !== "string" || !freshFetch(current.issuedAt, receivedAtMs))) ||
       !isValidConcentration(current.pm25) || !Number.isFinite(absoluteTime(current.time)) ||

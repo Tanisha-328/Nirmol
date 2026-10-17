@@ -58,7 +58,14 @@ function ReviewQueue({ userId, accountChanged }: { userId: string; accountChange
   const [notice, setNotice] = useState<"" | "failure" | "conflict" | "gone" | "saved" | "reasonInvalid" | "rate">("");
   const [reason, setReason] = useState(""), [decision, setDecision] = useState<"approve" | "reject">("approve");
   const [lastReviewed, setLastReviewed] = useState<string | null>(null);
-  const alive = useRef(true), version = useRef(0), pending = useRef(false), controllers = useRef(new Set<AbortController>()), panel = useRef<HTMLElement>(null);
+  const alive = useRef(true), version = useRef(0), pending = useRef(false), controllers = useRef(new Set<AbortController>()), panel = useRef<HTMLElement>(null), queue = useRef<HTMLElement>(null), returnToQueue = useRef(false);
+  useEffect(() => {
+    // Focus only after React has revealed the panel. Hidden elements cannot
+    // receive focus; closing/saving must also leave a visible keyboard target.
+    if (detail) panel.current?.focus();
+    else if (returnToQueue.current) { queue.current?.focus(); returnToQueue.current = false; }
+  }, [detail]);
+  function closeDetails() { returnToQueue.current = true; setDetail(null); setReason(""); }
   const cancel = useCallback(() => { alive.current = false; ++version.current; controllers.current.forEach(c => c.abort()); }, []);
   const call = useCallback(async (url: string, init: RequestInit = {}) => {
     const abort = new AbortController(); controllers.current.add(abort); const timer = setTimeout(() => abort.abort(), 15000);
@@ -94,7 +101,7 @@ function ReviewQueue({ userId, accountChanged }: { userId: string; accountChange
     try {
       const body = await call(`/api/reports/moderation/${id}`), parsed = readModerationDetail(body.detail);
       if (!parsed || parsed.report.id !== id) throw Error("invalid_response");
-      if (alive.current && version.current === v) { setDetail(parsed); setDecision(parsed.report.status === "approved" ? "reject" : "approve"); panel.current?.focus({ preventScroll: true }); }
+      if (alive.current && version.current === v) { setDetail(parsed); setDecision(parsed.report.status === "approved" ? "reject" : "approve"); }
     } catch (e) { if (alive.current && version.current === v) fail(e); }
     finally { if (alive.current && version.current === v) setLoading(false); }
   }
@@ -105,14 +112,14 @@ function ReviewQueue({ userId, accountChanged }: { userId: string; accountChange
     try {
       const body = await call("/api/reports/moderation", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: detail.report.id, decision, reason: reason.trim(), revision: detail.report.revision }) });
       const report = readOwnReport(body.report); if (!report || report.id !== detail.report.id) throw Error("invalid_response");
-      if (alive.current && v === version.current) { setNotice("saved"); setLastReviewed(report.id); setDetail(null); setReason(""); setReports(rows => rows.map(row => row.id === report.id ? report : row).filter(row => status === "all" || row.status === status)); }
-    } catch (e) { if (alive.current && v === version.current) { fail(e); setDetail(null); setReason(""); } }
+      if (alive.current && v === version.current) { setNotice("saved"); setLastReviewed(report.id); closeDetails(); setReports(rows => rows.map(row => row.id === report.id ? report : row).filter(row => status === "all" || row.status === status)); }
+    } catch (e) { if (alive.current && v === version.current) { fail(e); closeDetails(); } }
     finally { pending.current = false; if (alive.current) setSaving(false); }
   }
   const stamp = (s: string) => new Intl.DateTimeFormat(lang === "bn" ? "bn-BD" : "en-GB", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Dhaka" }).format(new Date(s));
   if (denied) return <p role="alert" className="community-card">{t.denied}</p>;
   return <div data-testid="moderation-private" className="space-y-5">
-    <section className="community-card"><h2 className="text-xl font-semibold">{t.queue}</h2><p className="text-sm text-[var(--muted)]">{t.limit}</p><div className="grid gap-3 sm:grid-cols-3"><label><span id="review-status-label">{t.status}</span><select aria-labelledby="review-status-label" className="community-input" disabled={saving} value={status} onChange={e => setStatus(e.target.value as ModerationState)}>{MODERATION_STATES.map(s => <option key={s} value={s}>{t[s]}</option>)}</select></label><label><span id="review-category-label">{t.category}</span><select aria-labelledby="review-category-label" className="community-input" disabled={saving} value={category} onChange={e => setCategory(e.target.value as ReportCategory | "")}><option value="">{t.allCategories}</option>{REPORT_CATEGORIES.map(c => <option key={c} value={c}>{CATEGORY_LABELS[lang][c]}</option>)}</select></label><button className="community-button self-end" disabled={saving || loading} onClick={() => void loadQueue()}>{t.refresh}</button></div>
+    <section ref={queue} tabIndex={-1} aria-labelledby="review-queue-title" className="community-card"><h2 id="review-queue-title" className="text-xl font-semibold">{t.queue}</h2><p className="text-sm text-[var(--muted)]">{t.limit}</p><div className="grid gap-3 sm:grid-cols-3"><label><span id="review-status-label">{t.status}</span><select aria-labelledby="review-status-label" className="community-input" disabled={saving} value={status} onChange={e => setStatus(e.target.value as ModerationState)}>{MODERATION_STATES.map(s => <option key={s} value={s}>{t[s]}</option>)}</select></label><label><span id="review-category-label">{t.category}</span><select aria-labelledby="review-category-label" className="community-input" disabled={saving} value={category} onChange={e => setCategory(e.target.value as ReportCategory | "")}><option value="">{t.allCategories}</option>{REPORT_CATEGORIES.map(c => <option key={c} value={c}>{CATEGORY_LABELS[lang][c]}</option>)}</select></label><button className="community-button self-end" disabled={saving || loading} onClick={() => void loadQueue()}>{t.refresh}</button></div>
       <ul className="grid gap-3 sm:grid-cols-2">{reports.map(r => <li key={r.id} className="rounded-xl border border-[var(--border)] p-3"><h3 className="font-semibold">{CATEGORY_LABELS[lang][r.category]}</h3><p>{reportStatusLabel(r.status, lang)}</p><p>{t.created}: {stamp(r.createdAt)}</p><p>{t.revision}: {r.revision}</p><button className="community-button mt-2" disabled={loading || saving} onClick={() => void open(r.id)}>{t.open}</button></li>)}</ul>
       {!loading && !reports.length && !notice && <p>{t.empty}</p>}{next && <button className="community-button" disabled={loading || saving} onClick={() => void loadQueue(next)}>{t.more}</button>}
     </section>
@@ -125,7 +132,7 @@ function ReviewQueue({ userId, accountChanged }: { userId: string; accountChange
         {detail.report.imageId && <PrivatePhoto key={detail.report.imageId} id={detail.report.imageId} userId={userId} invalidSession={accountChanged} denied={() => { setDenied(true); setDetail(null); setReports([]); }} />}
         <h3 className="font-semibold">{t.audit}</h3>{!detail.reviews.length && <p>{t.noAudit}</p>}<ol className="space-y-3">{detail.reviews.map(r => <li key={r.id} className="rounded-lg bg-[var(--soft)] p-3"><p>{t[r.from]} → {t[r.to]} · {stamp(r.reviewedAt)}</p><p className="break-all">{t.reviewer}: {r.reviewerId ?? t.removed}</p><p className="whitespace-pre-wrap break-words">{r.reason}</p></li>)}</ol>
         {detail.canReview ? <form className="grid gap-3" onSubmit={e => { e.preventDefault(); void save(); }}><label><span id="review-decision-label">{t.decision}</span><select aria-labelledby="review-decision-label" className="community-input" disabled={saving} value={decision} onChange={e => setDecision(e.target.value as "approve" | "reject")}><option value="reject">{t.reject}</option>{detail.report.status === "submitted" && <option value="approve">{t.approve}</option>}</select></label><label>{t.reason}<textarea className="community-input" rows={4} disabled={saving} maxLength={1000} value={reason} onChange={e => setReason(e.target.value)} /></label><button className="community-button dashboard-primary" disabled={saving} type="submit">{decision === "approve" ? t.approve : t.reject}</button></form> : <p>{t.self}</p>}
-        <div className="flex flex-wrap gap-3"><button className="community-button" disabled={saving || loading} onClick={() => void open(detail.report.id)}>{t.reload}</button><button className="community-button" disabled={saving} onClick={() => { setDetail(null); setReason(""); }}>{t.close}</button></div>
+        <div className="flex flex-wrap gap-3"><button className="community-button" disabled={saving || loading} onClick={() => void open(detail.report.id)}>{t.reload}</button><button className="community-button" disabled={saving} onClick={closeDetails}>{t.close}</button></div>
       </>}
     </section>
   </div>;

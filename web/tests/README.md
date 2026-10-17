@@ -1,3 +1,26 @@
+# Phase 05D release-candidate review
+
+The same full twelve-suite runner remains required. `release-candidate.test.mjs`
+adds independent F04/F14 source-eligibility boundaries; the product browser suite
+also rejects non-reference custom data in F03 and recovers to CAMS/hypothetical
+use. Positive custom-source fixtures use `dhaka-reference`, preserving all
+existing numeric, zero, expiry, retry and midnight assertions. This corrects
+older test assumptions that custom values were eligible at Dhaka city centre.
+
+Community browser checks add keyboard open/close/save focus through actual
+moderation handlers and controlled Auth/RPC protocols. Product scans now retain
+all 132 route/width/language/theme screenshots for review. Neither scripted
+keyboard interaction nor axe establishes actual assistive-technology usability.
+Native date-control theme/focus checks cover travel, Community, diary and simulator.
+The diary contention test foregrounds each tab, submits by keyboard and confirms
+both pending Web Lock requests before release; all conflict assertions remain.
+No real Supabase or live AI is part of these regressions.
+
+See `docs/phase05d-final-polish.md` for exact final receipts, known failures during
+reproduction, migration exclusions and outstanding real-service release gates.
+Keep the disposable test flags false, build before browsers, wait for the full
+runner to exit, and run any isolated load separately as described below.
+
 # Phase 05C product validation
 
 The full runner now has twelve suites, ending with `product-validation.browser.mjs`.

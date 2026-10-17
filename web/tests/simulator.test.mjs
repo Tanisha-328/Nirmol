@@ -25,7 +25,8 @@ const { compareHypothetical, readSimulatorCurrent, compareCurrent, compareForeca
 );
 const HOUR = 3_600_000;
 const now = Date.parse("2026-10-16T00:00:00Z");
-const location = { lat: 23.7808, lon: 90.4067 };
+// Retain both-source acceptance assertions at the only eligible custom reference.
+const location = { lat: 23.796374, lon: 90.424614 };
 const person = { ageGroup: "adult", sensitivities: [] };
 const baseline = { pm25: 80, outdoorHours: 2, activity: "walking" };
 const alternative = { pm25: 40, outdoorHours: 1, activity: "walking" };

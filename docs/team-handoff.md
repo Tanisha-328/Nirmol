@@ -1,5 +1,210 @@
 # Nirmol team handoff
 
+## Current handoff — Phase 05D complete, 18 October 2026 (Asia/Dhaka)
+
+**Ready for final GitHub handoff of the verified local application.** Branch
+`fix/location-reliability`, HEAD `db617c5598e2ac64e209d2ddc2f60e999c1a7fab`.
+The owner will perform GitHub integration personally. This session did not stage,
+commit, push, merge, switch branches, deploy, apply migrations, connect live
+Supabase, activate Gemini or enable A06. There are **18 unstaged paths: 16
+modified and 2 new**; the index is empty. The exact manifest and evidence are in
+[the final Phase 05D report](phase05d-final-polish.md).
+
+Final evidence: **451 web + 330 browser + 55 Python = 836 passed, zero failed**.
+All twelve browser suites finished against final production build
+`wSeTxXAbZq13BmxXlSo7G`; their saved complete receipts were recovered during
+resume, so browsers/build were not needlessly repeated. Web/Python, TypeScript,
+zero-warning ESLint, native XGBoost/SHAP and registry audits were rerun. Three
+real Supabase suites remain **skipped**, not passed. Automated axe scans cover
+176 states with zero violations/overflow and **61 manual-review groups** still
+open. Font/language restoration shifts remain (maximum raw accumulated
+pre-axe observation 0.327591); no field Core Web Vitals claim. The remaining
+performance smoke passed 50/50 synthetic local requests at 10 paced VUs for
+5 seconds, no errors/timeouts, p95 51.04 ms. The 05C full load matrix was not
+repeated. Neither fixture tests nor local load establish production readiness.
+
+Three targeted fixes are complete: moderator detail/queue keyboard focus,
+Baridhara-only custom-source validation in Exposure/Travel/Simulator, and themed
+native calendar controls. Positive custom-model expiry fixtures and two-tab
+diary orchestration were corrected without weakening their assertions. All
+formulas, model artifacts and the protected login background remain unchanged.
+
+### Implemented features and important paths
+
+Nirmol is a bilingual Bangladesh decision-support app: **Sense → Explain → Act →
+Report**. Public environmental tools require no account. Auth adds separate
+account convenience, reporting ownership and protected moderation.
+
+| Feature / route | Implemented behavior and limits |
+| --- | --- |
+| F01/F02/F07 `/` | Monitoring, forecast provenance/freshness and available hour-owned SHAP. Custom XGBoost only at evaluated Baridhara reference `23.796374, 90.424614`; CAMS regional-model fallback elsewhere. SHAP is on `log1p_pm25`, not causal source attribution or direct µg/m³ contributions. |
+| F03 `/exposure` | PM2.5 × hours × activity factor: rest 1.0, walking 1.5, heavy 2.5. Provisional comparison indicator, not dose or diagnosis. |
+| F04 `/travel` | Modeled departure-time exposure at one location; valid hourly coverage, Dhaka-local time. No physical route optimization or real-time traffic. |
+| F14 `/simulator` | Labeled hypothetical/current/forecast comparisons using existing exposure/travel math. No validated health-risk reduction. |
+| F09 `/diary` | Private browser/session storage, consented persistence/export/delete and conflict guards. Browser-scoped, unencrypted, not isolated by account; logout does not erase it. No silent upload. |
+| F10 `/alerts` | In-app threshold checks and session preferences; no push/background delivery. |
+| `/login`, `/my-nirmol` | Real SDK Auth/account adapters and saved-place/preferences UI; live hosted enforcement unverified. Google OAuth deferred. |
+| F06 `/reports` | Confirmed incident location/consents, private optional normalized photo, optional AI suggestion, owner history and withdrawal. AI labels remain suspected classifications. |
+| `/community`, `/moderation` | Approved coarse public report projection, filters/list/map fallback; protected review/approval/rejection/audit. No raw text/photo/identity/exact location in public summaries. Coarsening does not guarantee anonymity. |
+| F08 `/advisor` | Bilingual/Banglish contextual guidance, reviewed plans, explicit context/provider consent, safe fallback and quota contracts. Live Gemini not activated/verified. No diary/history/exact personal coordinates sent to Gemini. |
+
+- `web/src/app/`: Next.js routes, API handlers, middleware and shared styles.
+- `web/src/components/`: feature UI; `web/src/lib/`: shared math, validation,
+  location/i18n, environmental adapters, Auth/account, reporting/community and
+  advisor contracts. `air.ts` and `/api/air` distinguish CAMS from observations,
+  validate requested coordinates and reject stale/malformed data.
+- `web/tests/`, `web/scripts/`: deterministic units/browser fixtures, gated real
+  integration tests, provider-isolated load and operator-only image maintenance.
+- `jobs/`, `ml/`: Python runtime/jobs and saved XGBoost artifacts; no retraining
+  or publication is part of the local verification.
+- `supabase/migrations/`, `supabase/tests/`: reviewed source contracts and SQL
+  checks, **not proof of applied migrations or real RLS**.
+- `.github/workflows/forecast-runtime.yml`: nonpublishing native validation;
+  `forecast.yml`: disabled opt-in hourly publisher. Hosted CI is unverified.
+
+### Configuration names — never include secret values
+
+Copy root `.env.example` to `web/.env.local` locally; keep it untracked. Review
+hosting/build environment separately because `NEXT_PUBLIC_*` values enter browser
+bundles. Public keys do not replace RLS; secrets must remain server-only.
+
+| Names | Configuration responsibility |
+| --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | Reviewed project origin |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Preferred public key and legacy anon alternative; current Auth and air readers support this precedence, with no service-key fallback |
+| `NIRMOL_SITE_URL` | Canonical exact HTTPS origin in production; callback/Origin validation. Local production runs also need their explicit loopback origin. |
+| `SUPABASE_SERVICE_ROLE_KEY` | Server-only report/advisor worker operations; never browser/Auth fallback |
+| `GEMINI_API_KEY`, `GEMINI_REPORT_MODEL`, `GEMINI_ADVISOR_MODEL` | Server-only provider key and explicitly approved models; no model defaults or verified live schema compatibility |
+| `NIRMOL_REPORT_AI_ENABLED`, `NIRMOL_ADVISOR_ENABLED` | Keep false until separately approved capped integration/evaluation |
+| `NIRMOL_ADVISOR_COOKIE_SECRET` | At least 32 random server-only characters for guest cookies/HMACs |
+| `NIRMOL_ATOMIC_PUBLISHER_ENABLED` | Leave absent or false in local/hosting/Actions settings. **Do not enable.** |
+| `NIRMOL_LEGACY_FORECAST_BEFORE` | Optional fixed already-past legacy-reader cutoff; not publisher permission |
+| `OPENAQ_API_KEY`, `OPENROUTESERVICE_API_KEY` | Existing optional tooling/example names; F04 does not implement street routing |
+| `NIRMOL_REPORTING_CLEANUP_APPROVED` | Operator-only explicit target guard for cleanup; no maintenance was run or scheduled here |
+
+### Supabase migration, RLS, Storage and role integration
+
+**Inspect the actual target's catalog and migration history first. Do not bulk
+apply this directory or run an unreviewed `supabase db push`.** No SQL was applied
+in this session. Follow [the existing separate disposable setup guide](phase05b-local-supabase-setup.md)
+for future approved integration; its Docker/SQL execution remains unverified.
+
+| Migration | Actual dependency / integration action |
+| --- | --- |
+| `0001_init.sql` | Supabase Auth roles/schema and PostGIS; base profiles, forecasts, legacy reports/advisor. Its original report policies/projection alone are insufficient for current F06 privacy. Review grants, extension schema and legacy rows. |
+| `0002_forecast_publication.sql` | **Excluded, A06 experimental/unverified.** Requires existing forecast tables/RLS, service-role SELECT/INSERT/UPDATE and sequence grants, then adds publication metadata/RPC. Presence is not activation evidence. Do not apply, mark as applied, call its RPC or dispatch its workflow. |
+| `0003_account_settings.sql` | Auth users/roles, independent of A06; bounded owner-only account locations/preferences with revision trigger and forced RLS. |
+| `0004_reporting.sql` | `0001`, not `0002`; consent/private incident/image/classification/quota contracts, role protection, restrictive RLS, private bucket and coarse public projection. Commit enum extension before its new value is used; follow the disposable guide's explicit split/history handling. Never implicitly publish legacy reports. |
+| `0005_community_moderation.sql` | `0001` + `0004`, not A06; protected reviewer queue/detail/audit RPCs. |
+| `0006_advisor_quotas.sql` | Supabase roles/auth, independent of A06 and legacy advisor skeleton; dedicated quota/attempt tables and authenticated/worker reserve/finish/prune contracts. |
+
+Keep internal `nirmol_reporting`/`nirmol_advisor` schemas out of PostgREST's exposed
+schemas. Verify explicit table/RPC grants, empty search paths, RLS and direct REST
+bypass attempts with real A/B/anonymous/moderator identities. The
+`nirmol-report-images` bucket must remain **private**, JPEG-only, 2 MiB limit;
+residents must not read/write raw objects or mint signed URLs. Authorized server
+proxies/worker operations handle normalized photos. Test actual Storage policies,
+ownership, revoked sessions and deletion/retry behavior.
+
+Provision `profiles.is_moderator` only through a trusted admin SQL/server path
+after verifying the real user's Auth UUID. Never trust signup/JWT user metadata
+or permit resident self-promotion. Test role revocation with an existing session,
+self-review denial, stale revision conflicts and simultaneous review/withdrawal.
+Detailed provisioning and audit contracts: [Community/moderation handoff](community-map-moderation.md).
+
+### Auth, Gemini, deployment and operating gates for teammates
+
+1. Configure approved staging email/password Auth, exact site/callback allowlists,
+   confirmation/recovery templates, SMTP and rate limits. `/auth/callback` uses
+   browser-bound PKCE codes; confirmation/recovery must complete in the initiating
+   browser. Verify expiry, single use, refresh/revocation and shared-device account
+   changes. Google OAuth needs separate provider setup/implementation/testing.
+2. Execute `supabase/tests/account_settings.sql`, `reporting.sql`,
+   `community_moderation.sql` and `advisor_quotas.sql` on an approved disposable
+   target, plus the three gated SDK suites in `web/tests/`. Verify real grants,
+   RLS/Storage, quotas and transaction contention; fixture synchronization proves
+   neither PostgreSQL locking nor cross-instance enforcement. The SQL forecast
+   publication test belongs to a separate future A06 review and is excluded here.
+3. Configure approved Gemini models only after schema/response-format compatibility,
+   capped English/Bangla/Banglish evaluation and privacy/log review. Verify atomic
+   account/guest/project budgets, concurrent leases, timeouts and charged retries.
+   Guest cookie resets can create new actors; quotas are not per-human controls.
+4. Deploy only after reviewing HTTPS origin/public build keys, private/no-store
+   caching, callback/referrer/log redaction, server secret isolation and actual
+   hosted end-to-end behavior. Verify nonpublishing native Linux CI independently.
+   Keep A06 absent/false; pushing code must not unintentionally enable publication.
+5. Assign moderators, image cleanup/retention and advisor-ledger pruning. Verify
+   intended 90-day report expiry, seven-day post-deletion precise-evidence scrub,
+   recoverable photo deletion and backups/restore. Maintenance is not scheduled.
+   Review provider licensing, quotas, tile policy, costs, monitoring and abuse limits.
+6. Complete consented physical-device, screen-reader, zoom and participant checks
+   using [the existing volunteer protocol](phase05c-real-user-test-script.md).
+   Preserve honest scientific limits; native computation does not establish new
+   forecast skill, nationwide custom-model validity, clinical cutoffs or causation.
+
+Fresh registry audits still report **5 HIGH development entries, 0 critical**
+through `eslint-config-next → @next/eslint-plugin-next → fast-glob → micromatch →
+braces`; production-only audit reports **0 findings**. The existing P1 advisory
+status is preserved. No forced downgrade/override was applied. Historical
+feature-branch exceptions are not permission for a `main` merge; the owner/team
+must resolve their integration policy. See [the existing dependency audit](a12-a13-independent-audit.md).
+The unchanged login image contains an unverified adoption claim; it was preserved
+as explicitly required and needs owner-approved truthful content before public
+release. Remaining service/scientific/polish limits do not block this **local
+code handoff**, but production readiness is unverified.
+
+### Run and verify locally
+
+Use Node >=22 (verified locally with 24.18.0), the committed npm lock and the
+hashed Python 3.14 requirements. From `web`, after configuring local environment:
+
+```powershell
+npm.cmd ci
+npm.cmd run dev
+# For production verification, stop the dev server, then:
+node --test tests/*.test.mjs
+npm.cmd run build
+node node_modules/typescript/bin/tsc --noEmit
+node node_modules/eslint/bin/eslint.js . --max-warnings=0
+node scripts/run-browser-regressions.mjs "$env:TEMP\nirmol-location-browser\node_modules\playwright"
+npm.cmd audit --json
+npm.cmd audit --omit=dev --json
+```
+
+The Playwright path above is this machine's existing installation; supply an
+installed Playwright/Chromium path on another machine, as described in
+[the executable test README](../web/tests/README.md). The runner owns ports
+3001–3005, rejects occupied ports, clears real-service credentials and disables
+AI/A06. Use a fresh TEMP/TMP receipt directory and let it exit completely.
+Do not rebuild `.next` or run load alongside browser suites. Do not run the
+public-air or advisor-live-smoke scripts as part of offline regression.
+
+From repository root, use a pinned Python 3.14 virtual environment with
+`jobs/requirements.txt` installed using `--require-hashes --only-binary=:all:`:
+
+```powershell
+python -B -m unittest discover -s jobs/tests -v
+python -B jobs/forecast_runtime.py
+git diff --check
+```
+
+Keep `NIRMOL_F06_DISPOSABLE` and `NIRMOL_F08_DISPOSABLE` false during offline
+checks. Only teammates with explicit disposable-target authorization should
+enable the real SDK tests and provide their dedicated `*_DISPOSABLE_URL`,
+`*_DISPOSABLE_PUBLIC_KEY` and `*_DISPOSABLE_SERVICE_KEY` settings. Never run
+`jobs/refresh_forecast.py`, apply SQL or enable publication merely to verify a
+build. No new development phase or product feature is required for this handoff.
+
+## Historical handoff records
+
+The preserved records below describe older checkpoints. Their counts, feature
+absence statements, branches, permissions, uncommitted inventories and remote
+receipts are historical; the current status and instructions above supersede
+them. They confer no authorization to perform GitHub/service operations now.
+
+<details>
+<summary>Earlier implementation and delivery receipts (historical)</summary>
+
 **Phase 05C local product validation, 18 October 2026 (Asia/Dhaka):** started
 clean at owner-committed `7d345ccc4d6b9e8c3fb7c53e9e787420d9a1bf74` on
 `fix/location-reliability`; branch/HEAD remain unchanged. The earlier 05A/05B
@@ -442,3 +647,5 @@ Run smoke, gradually increasing arrival-rate, short burst and soak phases only a
 **Nirmol Campus is PROPOSED, not implemented.** A campus-focused pilot/support or investment concept could reuse verified public environmental tools and later approved reporting/advisor integrations. There is no implemented campus tenant system, billing, institutional dashboard, measured market return or validated investment claim. Keep this separate from the implemented feature inventory and demonstration.
 
 Remaining demo work is real Auth/staging verification, account RLS testing/selective deployment, Member 02 integration, deferred Google OAuth, reviewed branding/navigation across integrated pages, real Linux CI results and measured staging performance. Preserve the public-first architecture and explicit scientific/privacy boundaries throughout.
+
+</details>
