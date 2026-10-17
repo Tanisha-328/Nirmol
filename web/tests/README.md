@@ -1,3 +1,36 @@
+# Phase 03 Community Map and moderation
+
+From `web`, run `node --test tests/*.test.mjs`, `npx tsc --noEmit`,
+`npm run lint -- --max-warnings=0`, then a fresh `npm run build`. Run all browser
+suites with `node scripts/run-browser-regressions.mjs <Playwright-path>`.
+The runner owns loopback port 3001 and stops its server; Auth, F06 and Community
+own ports 3002/3003/3004 respectively. It refuses an occupied shared-server port,
+clears real-service keys for its children, disables AI/A06, and writes individual
+receipts under `%TEMP%/nirmol-p03-regression-*.log`. Do not rebuild `.next` while
+these browser servers are running.
+
+`node tests/community.browser.mjs <Playwright-path>` runs the Phase 03 browser
+suite alone. It starts/stops the real production Next app and synthetic
+Auth/PostgREST/Storage protocol fixture on port 3004. There is one fixture report
+store shared by F06, public and moderation RPC simulations. The production code
+always uses real F06 adapters. External browser traffic is blocked; the tile-outage
+test explicitly intercepts only the OSM tile origin. No real report is fabricated.
+Private preview uses real normalized JPEG bytes and the real authorized proxy.
+
+`community-moderation.test.mjs` covers strict public/private contracts, filters,
+pagination, authorization orchestration, account guards and SQL source boundaries.
+Browser checks cover submission → pending → moderator approval → public cell →
+withdrawal, rejection, reviewer conflicts, forged roles, self-review, account races,
+private previews, AI labels, zero reports, outages, expiry, keyboard and translations.
+All these results are deterministic; they do **not** prove PostgreSQL row locking,
+RLS or hosted Storage enforcement.
+
+Separately gated real checks: `supabase/tests/community_moderation.sql` and
+`node --test tests/community.storage.integration.mjs tests/reporting.storage.integration.mjs`.
+Missing explicit disposable configuration skips both SDK tests. See
+`docs/community-map-moderation.md` for operator setup; do not apply migrations
+or run these suites on a shared/live service as part of local verification.
+
 # F06 Phase 2 reporting
 
 Run the full `node --test tests/*.test.mjs`, strict lint, TypeScript and fresh

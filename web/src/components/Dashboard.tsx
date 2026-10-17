@@ -169,6 +169,7 @@ export function Dashboard() {
         <Link href="/my-nirmol" className="min-h-11 py-2.5 underline">{lang === "bn" ? "আমার নির্মল" : "My Nirmol"}</Link>
         <Link href="/login" className="min-h-11 py-2.5 underline">{lang === "bn" ? "সাইন ইন / অ্যাকাউন্ট তৈরি" : "Sign in / Create account"}</Link>
         <Link href="/reports" className="min-h-11 py-2.5 underline">{lang === "bn" ? "দূষণের উৎস রিপোর্ট" : "Report a pollution source"}</Link>
+        <Link href="/community" className="min-h-11 py-2.5 underline">{lang === "bn" ? "কমিউনিটি ম্যাপ" : "Community Map"}</Link>
         <span className="py-2.5 text-[var(--muted)]">{lang === "bn" ? "সব পাবলিক টুল উন্মুক্ত" : "Public tools stay open"}</span>
       </nav>
 

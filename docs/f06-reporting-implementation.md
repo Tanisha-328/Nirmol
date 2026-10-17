@@ -1,5 +1,10 @@
 # F06 reporting — Phase 2 implementation and verification
 
+Historical Phase 2 receipt. On 18 October 2026 the owner’s clean repository was
+verified at `60c09e4`, which commits Phase 2. The Community Map/moderator work is
+now described in [the separate Phase 03 review](community-map-moderation.md).
+Its additive migration remains unapplied; this does not certify live enforcement.
+
 Prepared 17 October 2026. Branch: `fix/location-reliability`. Starting HEAD:
 `5f4e3034460d1bbc38f91870c847b3b42bc20cb5`; the owner committed Phase 1 there.
 The starting working tree was clean. Phase 2 remains local and unstaged. No

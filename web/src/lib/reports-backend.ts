@@ -3,6 +3,7 @@ import { cleanDescription, exactKeys, isCategory, isDate, isRecord, isUuid, pars
   readSourceSuggestion, ReportError, suggestionExplanation, RAW_PHOTO_LIMIT, STORED_PHOTO_LIMIT, type SourceSuggestion, type ReportImageReceipt } from "./reports";
 import { photoFormat, sha256, type NormalizedPhoto } from "./report-images";
 import { randomUUID } from "node:crypto";
+import { MODERATION_STATES, readModerationDetail } from "./moderation";
 
 export type RpcResult = { data: unknown; error: { code?: string; message?: string } | null };
 export type ReportClient = { rpc(name: string, params?: Record<string, unknown>): PromiseLike<RpcResult>;
@@ -13,7 +14,7 @@ export type ReportingDependencies = { client(): Promise<ReportClient>; publicCli
   normalize(bytes: Uint8Array, mime: string, filename: string): Promise<NormalizedPhoto>;
   classify(bytes: Uint8Array, description: string): Promise<SourceSuggestion>; aiEnabled(): boolean;
   now(): number; origin?: string | null; diagnostic(code: string): void };
-export type ReportingRoute = "reports" | "report" | "images" | "image" | "classify" | "public" | "public-report" | "moderation";
+export type ReportingRoute = "reports" | "report" | "images" | "image" | "classify" | "public" | "public-report" | "moderation" | "moderation-detail";
 
 const PRIVATE_HEADERS = { ...AUTH_PRIVATE_HEADERS, Vary: "Cookie" };
 function response(body: unknown, status = 200, publicData = false) {
@@ -93,9 +94,10 @@ export async function handleReporting(request:Request, route:ReportingRoute, id:
   const method=request.method;
   const isPublic=route==="public"||route==="public-report";
   try {
-    const allowed:Record<ReportingRoute,string[]>={reports:["GET","POST"],report:["GET","DELETE"],images:["POST"],image:["GET","DELETE"],classify:["POST"],public:["GET"],"public-report":["GET"],moderation:["GET","POST"]};
+    const allowed:Record<ReportingRoute,string[]>={reports:["GET","POST"],report:["GET","DELETE"],images:["POST"],image:["GET","DELETE"],classify:["POST"],public:["GET"],"public-report":["GET"],moderation:["GET","POST"],"moderation-detail":["GET"]};
     if(!allowed[route].includes(method))return response({error:"method_not_allowed"},405,isPublic);
     if(id!==null&&!isUuid(id))throw new ReportError("not_found",404);
+    if(new URL(request.url).search.length>2048)throw new ReportError("invalid_filter");
     if(method!=="GET"&&!hasTrustedOrigin(request,deps.origin??getAuthConfig()?.siteUrl))throw new ReportError("untrusted_origin",403);
     if(isPublic){
       const q=new URL(request.url).searchParams;
@@ -112,7 +114,7 @@ export async function handleReporting(request:Request, route:ReportingRoute, id:
     if(isAuthUnavailable(error))throw new ReportError("authentication_unavailable",503);
     if(error||!user||user.is_anonymous)throw new ReportError("authentication_required",401);
     // Expected identity is only a stale-tab guard. All ownership is derived from verified Auth/RLS.
-    if(method!=="GET"&&request.headers.get("x-expected-user")!==user.id)throw new ReportError("account_changed",409);
+    if((method!=="GET"||request.headers.has("x-expected-user"))&&request.headers.get("x-expected-user")!==user.id)throw new ReportError("account_changed",409);
     const envelope=(body:Record<string,unknown>)=>({...body,userId:user.id});
     if(route==="reports"&&method==="GET"){
       const q=new URL(request.url).searchParams;const after=q.get("after");
@@ -189,12 +191,27 @@ export async function handleReporting(request:Request, route:ReportingRoute, id:
       }catch(e){try{await rpc(worker,"f06_finish_classification",{p_id:requestId,p_owner:user.id,p_result:null});}catch{deps.diagnostic("classification_finalize_pending");}throw e;}
     }
     if(route==="moderation"){
-      if(method==="GET")return response(envelope({reports:ownList(await rpc(client,"f06_moderation_queue"))}));
+      if(method==="GET"){
+        const q=new URL(request.url).searchParams;
+        // Preserve the Phase 2 queue contract for existing consumers.
+        if(!q.size)return response(envelope({reports:ownList(await rpc(client,"f06_moderation_queue"))}));
+        const state=q.get("status")??"submitted",category=q.get("category"),after=q.get("after");
+        if([...q.keys()].some(k=>!["status","category","after"].includes(k)||q.getAll(k).length!==1)||
+          !MODERATION_STATES.includes(state as typeof MODERATION_STATES[number])||(category!==null&&!isCategory(category))||(after!==null&&!isUuid(after)))throw new ReportError("invalid_filter");
+        const reports=ownList(await rpc(client,"f06_moderation_reports",{p_status:state,p_category:category,p_after:after}));
+        return response(envelope({reports,next:reports.length===50?reports.at(-1)?.id:null}));
+      }
       const body=await json(request);
       if(!isRecord(body)||!exactKeys(body,["id","decision","reason","revision"])||!isUuid(body.id)||!["approve","reject"].includes(body.decision as string)||
         typeof body.reason!=="string"||body.reason.trim().length<10||!cleanDescription(body.reason.trim())||!Number.isSafeInteger(body.revision)||(body.revision as number)<0)throw new ReportError("invalid_review");
       const report=readOwnReport(await rpc(client,"f06_review",{p_id:body.id,p_decision:body.decision,p_reason:body.reason.trim(),p_revision:body.revision}));
       if(!report)throw new ReportError("reporting_unavailable",503);return response(envelope({report}));
+    }
+    if(route==="moderation-detail"){
+      if(new URL(request.url).search)throw new ReportError("invalid_filter");
+      const detail=readModerationDetail(await rpc(client,"f06_moderation_detail",{p_id:id}));
+      if(!detail)throw new ReportError("reporting_unavailable",503);
+      return response(envelope({detail}));
     }
     throw new ReportError("not_found",404);
   }catch(error){

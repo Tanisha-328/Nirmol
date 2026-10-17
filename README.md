@@ -31,8 +31,11 @@ supabase/migrations/    Database schema
    `0002`. No live migration is part of local setup. F06 now has a local reporting
    backend/UI and separate **unapplied** `0004_reporting.sql`; follow the reviewed
    disposable-only setup in [the F06 report](docs/f06-reporting-implementation.md).
-   Real DB/Storage/provider enforcement is unverified. F08 and Phase 3 map/moderator
-   UI remain pending. Reporting AI is optional and off by default.
+   Phase 3 adds `/community`, `/moderation` and the separate, **unapplied**
+   `0005_community_moderation.sql`. See [Community Map and moderation](docs/community-map-moderation.md)
+   for contracts, verification and secure test-reviewer provisioning. Real
+   DB/Storage/provider enforcement is unverified. F08 remains pending. Reporting AI
+   is optional and off by default.
 4. Offline model verification: create a Python 3.14 virtual environment, install
    `jobs/requirements.txt` with `--require-hashes --only-binary=:all:`, then run
    `python -B jobs/forecast_runtime.py`. This uses real artifacts and fixtures,
@@ -69,4 +72,6 @@ enable the A06 publisher.
 Weather and air-quality model data from [Open-Meteo](https://open-meteo.com/)
 (CC BY 4.0). Historical training measurements are documented in the model
 evaluation and station audit, including [OpenAQ](https://openaq.org/). Street
-routing and the teammate community map are not integrated in this checkout.
+routing remains unimplemented. Community Map uses approved F06 summaries and a
+bundled geoBoundaries country outline (CC0); optional OpenStreetMap background
+tiles require its attribution and [tile usage policy](https://operations.osmfoundation.org/policies/tiles/).

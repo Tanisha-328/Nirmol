@@ -1,5 +1,20 @@
 # Nirmol team handoff
 
+**Phase 03 local follow-up, 18 October 2026 (Asia/Dhaka):** verified clean
+`fix/location-reliability` at `60c09e4`; Phase 2 is committed there. The historical
+“uncommitted” and “map/moderator absent” statements below describe the earlier
+checkpoint. Phase 03 now adds the real F06-backed Community Map, authorized review
+dashboard and additive, unapplied `0005_community_moderation.sql`. See
+[the Phase 03 implementation, exact checks and remaining service verification](community-map-moderation.md).
+No branches, commits, index entries, migrations, deployment or publication were
+changed. Real Supabase enforcement remains unverified and A06 remains disabled.
+Final Phase 03 verification: **392 web unit/API/maintenance + 292 browser + 51
+Python = 735 passed, zero failed**; two real disposable SDK suites skipped.
+TypeScript, strict zero-warning ESLint, fresh production build and whitespace
+checks pass. All nine browser suites passed against the final build. The index
+is empty, HEAD remains `60c09e4`, and all owned test servers are stopped. The
+Phase 03 review contains the full 28-file manifest, test receipts and live blockers.
+
 Status prepared on 2026-10-17. This document describes the actual local implementation and separates local fixture verification from deployed services. The owner explicitly accepted the inherited dependency P1 for feature-branch commits and pushes only. The advisory remains unresolved; no live Auth, database authorization or deployment verification is claimed. The owner prohibits merging or pushing `main` during this handoff.
 
 **Phase 2 local follow-up, 17 October 2026:** the owner committed Phase 1 at `5f4e3034460d1bbc38f91870c847b3b42bc20cb5` on `fix/location-reliability`; Phase 2 started from that clean tree. F06 now has actual authenticated reporting, private normalized uploads, optional server Gemini classification, ownership/moderation/public-safe backend contracts and bilingual submission/history/withdrawal UI. Phase 2 changes remain unstaged and uncommitted for owner review. See [F06 implementation and exact evidence](f06-reporting-implementation.md). Its migration is **unapplied**, real DB/RLS/Storage and live Gemini are **unverified**, and maintenance is **not scheduled**. Community Map/moderator UI remain Phase 3; F08 is absent. No migrations, workflows, publisher activation, deployment, commit or push was performed. The inherited dependency advisory is unresolved.

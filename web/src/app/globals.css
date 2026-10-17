@@ -63,3 +63,16 @@ body {
   outline-offset: 3px;
 }
 .account-page .account-primary { background: #12573f; color: #fff; }
+
+.community-card { border: 1px solid var(--border); background: var(--card); border-radius: 1rem; padding: 1.25rem; display: grid; gap: 0.8rem; }
+.community-button { min-height: 44px; border: 1px solid var(--border); border-radius: 0.5rem; padding: 0.5rem 0.8rem; font-weight: 600; font-size: 0.875rem; }
+.community-button:disabled { opacity: 0.6; }
+.community-link { min-height: 44px; padding-block: 0.6rem; text-decoration: underline; }
+.community-input { width: 100%; min-width: 0; min-height: 44px; margin-top: 0.3rem; padding: 0.5rem; border: 1px solid var(--border); border-radius: 0.5rem; background: var(--background); color: var(--foreground); }
+.community-page :is(button, a, input, select, textarea, [tabindex]):focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+.community-canvas.leaflet-container { background: #e8f0ed; color: #0f1b2d; z-index: 0; }
+.community-canvas .community-marker { display: grid; place-items: center; background: #0b686b; color: white; border: 3px solid white; border-radius: 50%; font-size: 14px; font-weight: 700; box-shadow: 0 1px 5px #1236; }
+.community-canvas .community-marker.selected { background: #7e3b12; }
+.community-canvas .leaflet-control-attribution { background: #fff; color: #253b46; }
+.community-canvas .leaflet-control-attribution a { color: #075c70; }
+.community-page [hidden] { display: none !important; }
