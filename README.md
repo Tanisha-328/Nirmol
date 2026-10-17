@@ -28,8 +28,11 @@ supabase/migrations/    Database schema
 3. Account storage migration `0003_account_settings.sql` is **unapplied and not
    production verified**. Review/test it in a disposable environment first.
    Do not bulk-run migrations: that would also apply unverified A06 migration
-   `0002`. No live migration is part of local setup. F06/F08 integration remains
-   with Member 02; no reporting bucket or advisor route is fabricated here.
+   `0002`. No live migration is part of local setup. F06 now has a local reporting
+   backend/UI and separate **unapplied** `0004_reporting.sql`; follow the reviewed
+   disposable-only setup in [the F06 report](docs/f06-reporting-implementation.md).
+   Real DB/Storage/provider enforcement is unverified. F08 and Phase 3 map/moderator
+   UI remain pending. Reporting AI is optional and off by default.
 4. Offline model verification: create a Python 3.14 virtual environment, install
    `jobs/requirements.txt` with `--require-hashes --only-binary=:all:`, then run
    `python -B jobs/forecast_runtime.py`. This uses real artifacts and fixtures,

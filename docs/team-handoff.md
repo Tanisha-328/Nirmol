@@ -2,7 +2,11 @@
 
 Status prepared on 2026-10-17. This document describes the actual local implementation and separates local fixture verification from deployed services. The owner explicitly accepted the inherited dependency P1 for feature-branch commits and pushes only. The advisory remains unresolved; no live Auth, database authorization or deployment verification is claimed. The owner prohibits merging or pushing `main` during this handoff.
 
-**Local Phase 1 follow-up, 17 October 2026:** location reliability changes are uncommitted on `fix/location-reliability`, based on `1abf56068e7d7465127107208806220af2721f51`. The latest instruction reserves all commits and pushes to the owner; the historical delivery receipts below are not new authorization. See [the location reliability review](location-reliability-review.md) for changes, exact verification and remaining limits. Coverage now uses a pinned country polygon; custom forecasts are restricted to the evaluated Baridhara reference point, with CAMS elsewhere. Public manual search covers the listed cities/reference only, with no neighborhood geocoder. GPS retains real capture/accuracy evidence and all restoring public tools share selection validation. F06, Community Map and F08 remain application-unimplemented in the inspected local/remote tips. No migrations, workflows, publisher activation or deployments were performed; the inherited development dependency advisory remains unresolved.
+**Phase 2 local follow-up, 17 October 2026:** the owner committed Phase 1 at `5f4e3034460d1bbc38f91870c847b3b42bc20cb5` on `fix/location-reliability`; Phase 2 started from that clean tree. F06 now has actual authenticated reporting, private normalized uploads, optional server Gemini classification, ownership/moderation/public-safe backend contracts and bilingual submission/history/withdrawal UI. Phase 2 changes remain unstaged and uncommitted for owner review. See [F06 implementation and exact evidence](f06-reporting-implementation.md). Its migration is **unapplied**, real DB/RLS/Storage and live Gemini are **unverified**, and maintenance is **not scheduled**. Community Map/moderator UI remain Phase 3; F08 is absent. No migrations, workflows, publisher activation, deployment, commit or push was performed. The inherited dependency advisory is unresolved.
+
+The [Phase 1 review](location-reliability-review.md) remains its historical receipt; its “uncommitted” statements describe the earlier review checkpoint. Country coverage uses the pinned polygon, custom forecasts remain restricted to the evaluated Baridhara reference, and CAMS covers other supported points. Manual search remains the listed reference registry. All commits/pushes remain reserved to the owner; historical receipts below confer no new authorization.
+
+Phase 2 local verification: **372 web unit/API/maintenance + 268 browser + 51 Python = 691 passed, zero final failures**; TypeScript, strict zero-warning lint and fresh production build pass. The real disposable Supabase SDK suite is **skipped (1)**; SQL/RLS and Storage enforcement remain **unexecuted/unverified**. The new SQL files parse but have not been applied. The F06 report contains the 37-file manifest, exact commands, failure repairs, privacy/retention rules, quotas and Phase 3 prerequisites. All changes remain unstaged; A06 stays disabled and the approved Auth image is unchanged.
 
 ## Architecture and ownership
 
@@ -12,7 +16,7 @@ Nirmol is a public-first Bangladesh environmental decision-support application: 
 - `web/src/lib/air.ts` and `/api/air`: server-side environmental adapters, bounded provider requests, source validation, Nirmol publication selection and CAMS fallback. Browser clients receive validated source/timestamp metadata, not provider credentials.
 - `jobs/` and `ml/`: Python forecast construction and saved XGBoost artifacts. Native verification uses the existing artifacts and controlled inputs; no training is part of this handoff.
 - Supabase Auth: genuine server-side email/password authentication using `@supabase/ssr` **0.12.7** and `@supabase/supabase-js` **2.118.0**. Account settings use a separate additive, unapplied table.
-- Member 02 owns **F06 pollution reporting/community map** and **F08 Bangla AI advisor**. Their implementations are absent from this checkout and the fetched teammate branch. The schema skeleton is not evidence that either feature is implemented.
+- F06 Phase 2 is implemented locally on the owner's instruction, reusing Member 02's schema skeleton. Coordinate integration with teammate work before merging. Community Map/moderator UI and F08 remain absent; historical remote snapshots below have not been refreshed during Phase 2.
 
 | Feature | Local implementation | Owner/integration boundary |
 | --- | --- | --- |
@@ -20,7 +24,7 @@ Nirmol is a public-first Bangladesh environmental decision-support application: 
 | F02 forecasts | Nirmol run reader and CAMS fallback | Owner-side; A06 publisher remains disabled |
 | F03 exposure | Activity-adjusted concentration–time indicator with provisional bands | Shared calculation authority in `exposure.ts` |
 | F04 travel | Departure-time comparison within valid forecast coverage | Shared integration authority in `travel.ts`; no street routing |
-| F06 reporting/map | **Not integrated** | Member 02; no fabricated map, submission or report history |
+| F06 reporting/map | Local Phase 2 submission/backend/history; map UI pending | Unapplied `0004`, real enforcement/provider checks outstanding; Phase 3 map/moderator UI |
 | F07 explainability | Genuine stored, hour-owned model factors where eligible | Log1p attribution scale; absent explanations stay absent |
 | F08 advisor | **Not integrated** | Member 02; no fabricated AI response or medical context |
 | F09 diary | Public browser-private activity/symptom diary | Existing browser storage only; no account synchronization |
@@ -39,6 +43,8 @@ Nirmol is a public-first Bangladesh environmental decision-support application: 
 | `/simulator` | Public | F14 what-if exposure comparisons |
 | `/diary` | Public, browser-private data | F09 diary; authentication does not change its storage |
 | `/alerts` | Public | F10 in-app alerts |
+| `/reports` | Public introduction; authenticated submission/history | F06 suspected-source reports, optional private photo/AI and withdrawal; no map UI |
+| `/api/reports` and descendants | Verified owner/moderator or explicit public-safe GET | Eight route contracts documented in the F06 implementation report |
 | `/login` | Public | Bilingual sign-in/sign-up/recovery controls and guest exit |
 | `/my-nirmol` | Authenticated, server verified | Distinct personal dashboard; unauthenticated requests redirect to login |
 | `/api/air` | Public GET | Validated Bangladesh coordinates only; environmental response is not an account API |
@@ -46,7 +52,7 @@ Nirmol is a public-first Bangladesh environmental decision-support application: 
 | `/auth/callback` | Public callback endpoint | Validates and exchanges browser-bound PKCE codes; safe redirects only |
 | `/api/account` | Authenticated GET/PUT | Owner-scoped account settings; same-origin writes and optimistic revision checks |
 
-No F06/F08 route is promised. Add their navigation only after the actual teammate routes and backend ownership/moderation contracts are integrated and tested.
+F06 navigation points to the implemented `/reports` route. Public report APIs expose only approved coarse-cell summaries. No Community Map, moderator dashboard or F08 route is promised.
 
 ## Selected image and login UI
 
@@ -76,7 +82,9 @@ Names only; never add values to this document or Git:
 | `NIRMOL_ATOMIC_PUBLISHER_ENABLED` | Experimental publisher switch; **leave absent**, or explicitly `false` |
 | `NIRMOL_LEGACY_FORECAST_BEFORE` | Optional fixed, already-past legacy-reader cutoff; not permission to publish |
 | `OPENAQ_API_KEY` | Optional existing measured-data/training tooling; not an authentication requirement |
-| `GEMINI_API_KEY` | Reserved server-side advisor/report integration dependency; no F08 implementation is claimed |
+| `GEMINI_API_KEY` | Optional server-only F06 classifier key; no F08 implementation is claimed |
+| `GEMINI_REPORT_MODEL` | Explicit operator-selected structured-output model; live compatibility unverified |
+| `NIRMOL_REPORT_AI_ENABLED` | F06 AI only; defaults false, requires model/key and per-request consent |
 | `OPENROUTESERVICE_API_KEY` | Existing example only; F04 does not perform street-level routing |
 
 The root `.env.example` includes the new publishable-key and site-origin names without values. The Auth configuration fails closed without a valid public key and, in production, an explicit canonical site origin. The existing forecast reader's anon-key requirement must be retained if deploying only a publishable Auth key.
@@ -155,7 +163,7 @@ Saved places and their names are personal account data even though the account s
 
 ## Member 02 integration contracts
 
-F06 integration must supply actual public-map and authenticated submission/management routes; account/report ownership must derive from the server-verified user and real RLS. Preserve consent for photos/geolocation, public-location precision reduction, metadata stripping, moderation states and human confirmation of suggested AI labels. Do not populate My Nirmol with invented reports or expose raw reporter identity through a public map.
+F06 Phase 2 supplies authenticated submission/management and approved public-safe APIs, with consent, normalization, database ownership and human-confirmed categories. Real enforcement is unverified until the disposable SQL/Storage suites run. Phase 3 must build the public map and authorized moderator/audit UI from these contracts, preserving coarse cells and reporter privacy. My Nirmol links to genuine own-report history; no records are fabricated.
 
 F08 integration must supply the real advisor route/API, provider/model configuration, error and rate-limit contract, and a reviewed personal-context payload. General guidance remains public. Any account-location context requires a separate opt-in; diary symptoms/notes require a distinct, explicit action and consent, with no automatic synchronization. No diagnosis, fabricated traffic density or pollution-source claim is acceptable. Reserved text on My Nirmol is a boundary notice, not a working advisor/report feature.
 
@@ -287,7 +295,7 @@ For an independent final-tip comparison, run `git ls-remote --heads origin refs/
 2. Verify a staging Supabase Auth project: exact origin/redirects, confirmation, SMTP, recovery expiry, session refresh/revocation and rate limits. Keep service keys server-only and test that logs omit credentials/callback tokens.
 3. Execute account-only disposable database/RLS/PostgREST checks and obtain a separate selective rollout approval. **Do not bulk-apply migrations or enable A06.**
 4. Verify deployed guest routes and narrow-screen login/My Nirmol; inspect screenshots, keyboard focus, language changes, contrast, errors/retries, cross-tab account changes and shared-device notices.
-5. Integrate and test the real Member 02 F06/F08 contracts. Keep unavailable boundaries honest in the demo. Add Google only after its real provider flow is configured and verified.
+5. Review the local F06 Phase 2 contracts with Member 02, execute real disposable enforcement tests, then implement Phase 3 map/moderation. F08 remains pending. Keep unavailable boundaries honest in the demo. Add Google OAuth only after its real provider flow is configured and verified.
 6. Execute the credential-free native Linux validation workflow and inspect the actual result. Live environmental provider behavior and hosting settings remain separate from fixture coverage.
 7. Fresh-fetch and review proposed integration before any main merge. Confirm a push cannot trigger unexpected migration, publication or unsafe deployment behavior.
 
@@ -301,7 +309,7 @@ Use k6 or Artillery against an explicitly approved isolated staging deployment. 
 | --- | --- |
 | Guests | Load dashboard and public tools, vary a bounded set of Bangladesh places, inspect cache reuse, error budgets, timeouts and source/freshness correctness |
 | Authenticated users | Synthetic sign-in/session restoration, My Nirmol reads, owner-scoped settings updates, stale-revision conflicts, default-place changes and sign-out/account switching |
-| F06 after integration | Synthetic submission/photo fixtures with consent, owner checks, moderation isolation and reduced-precision public map reads; no real publication |
+| F06 Phase 2 | Deterministic submission/photo/AI/Auth fixtures with consent, ownership, session races and coarse public output; real DB/Storage/provider unverified, no public map UI |
 | F08 after integration | Stub provider responses, explicit context opt-in, rate/quota limits, cancellation/error handling and proof that diary context is excluded unless separately consented |
 
 Run smoke, gradually increasing arrival-rate, short burst and soak phases only after baseline correctness. Capture p50/p95/p99 latency, request/error/timeout rates, process memory, event-loop/CPU behavior, provider-call counts/cache hit rates, database connection/query latency, authorization failures and fixture cleanup results. Define acceptance thresholds with the team before running. Inspect browser bundles and image transfer costs separately; compare representative 320px/mobile and desktop route loading. Do not publish a capacity number until a documented measured run supports it.

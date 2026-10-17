@@ -435,12 +435,12 @@ test("A11 SHAP, action links and keyboard focus work at 320px, tablet and deskto
       await page.keyboard.press("Tab"); await forecastHour().focus();
       const focus = await forecastHour().evaluate((element) => ({ focused: document.activeElement === element, outline: getComputedStyle(element).outlineStyle, width: parseFloat(getComputedStyle(element).outlineWidth) }));
       assert.equal(focus.focused, true); assert.notEqual(focus.outline, "none"); assert.ok(focus.width > 0);
-      for (const href of ["/exposure", "/travel", "/simulator", "/diary"]) {
+      for (const href of ["/exposure", "/travel", "/simulator", "/diary", "/reports"]) {
         const link = page.locator(`main a[href="${href}"]`); assert.equal(await link.count(), 1);
         assert.ok((await link.innerText()).trim().length > 0); await link.focus();
         assert.equal(await link.evaluate((element) => document.activeElement === element), true);
       }
-      assert.equal(await page.locator('main a[href*="report"]').count(), 0, "no invented reporting route");
+      assert.equal(await page.locator('main a[href*="report"]').count(), 1, "only the implemented reporting submission route is linked");
     }
   }
   assert.equal(await page.evaluate(() => window.airRequests.length), 1, "hour, locale, theme and viewport changes do not fetch again");

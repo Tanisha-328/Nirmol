@@ -1,3 +1,22 @@
+# F06 Phase 2 reporting
+
+Run the full `node --test tests/*.test.mjs`, strict lint, TypeScript and fresh
+production build, then `node tests/reporting.browser.mjs <Playwright-path>`.
+F06 owns loopback port 3003 and its controlled Auth/RPC/Storage protocol fixture;
+do not run another server on that port. It uses runtime-generated synthetic
+credentials, real Next handlers, real sharp decode/re-encode, and blocked external
+browser traffic. AI transport failures/schema checks are unit fixtures; UI-only
+suggestions use explicit route interception. No live Google call is made.
+
+`reports.test.mjs` covers pure contracts, privacy cells, image normalization and
+Gemini validation. `reporting-api.test.mjs` exercises HTTP orchestration through
+injected transports. These **do not verify real PostgreSQL/RLS/Storage enforcement**.
+The real disposable suites are `supabase/tests/reporting.sql` and
+`node --test tests/reporting.storage.integration.mjs` (skips without explicit
+disposable configuration). Follow the isolated setup and approval gates in
+`docs/f06-reporting-implementation.md`; do not bulk-run A06 migration `0002`.
+No live migrations or cleanup are part of the deterministic tests.
+
 # Phase 1 location reliability
 
 Run `node --test tests/location.test.mjs tests/air.test.mjs` and the full existing
@@ -81,7 +100,8 @@ One air request runs after restoration; manual refresh/location changes start on
 new cancellable request with a 15-second UI deadline. There is no automatic network
 polling, push, service worker, delivery provider or closed-page monitoring. Open-page
 clock checks and visibility/focus listeners expire cached data without HTTP calls.
-No reporting route exists in this checkout; Member 02 integration remains pending.
+F06 now has `/reports`; Community Map and moderator UI remain Phase 3. Alerts still
+link through the dashboard and do not implicitly copy private incident coordinates.
 
 # Exposure checks
 
@@ -169,8 +189,9 @@ The AQI breakpoint calculation is unchanged and is labelled an indicative
 PM2.5-based estimate, with a regulatory/NowCast averaging disclaimer. SHAP is
 labelled as log-scale model attribution, not pollution causation or uncertainty.
 Links open the existing personalization tools, which refresh their own data;
-users confirm location/source there. No reporting route exists in this checkout;
-connecting Member 02's reporting UI remains a separate integration dependency.
+users confirm location/source there. The dashboard also links to the actual F06
+submission route. Reporting requires a separate explicit incident location and
+does not copy dashboard/diary/account context.
 
 # Reliability batch: coverage, issuance and deadlines
 

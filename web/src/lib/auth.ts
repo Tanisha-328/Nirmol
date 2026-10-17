@@ -45,7 +45,7 @@ export function getAuthConfig(env: Record<string, string | undefined> = process.
 /** Deliberately allow only implemented public tools and the account page. */
 export function safeRedirect(value: unknown, fallback = "/my-nirmol"): string {
   if (typeof value !== "string" || value.length > 256 || /[\\\u0000-\u0020\u007f%?#]/.test(value)) return fallback;
-  return ["/", "/my-nirmol", "/exposure", "/travel", "/simulator", "/alerts", "/diary"].includes(value) ? value : fallback;
+  return ["/", "/my-nirmol", "/exposure", "/travel", "/simulator", "/alerts", "/diary", "/reports"].includes(value) ? value : fallback;
 }
 
 /** Cookie-authenticated writes require an exact trusted Origin, including login. */

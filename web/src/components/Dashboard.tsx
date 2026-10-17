@@ -168,6 +168,7 @@ export function Dashboard() {
       <nav aria-label={lang === "bn" ? "অ্যাকাউন্ট ও পাবলিক টুল" : "Account and public tools"} className="flex flex-wrap gap-x-5 gap-y-1 text-sm">
         <Link href="/my-nirmol" className="min-h-11 py-2.5 underline">{lang === "bn" ? "আমার নির্মল" : "My Nirmol"}</Link>
         <Link href="/login" className="min-h-11 py-2.5 underline">{lang === "bn" ? "সাইন ইন / অ্যাকাউন্ট তৈরি" : "Sign in / Create account"}</Link>
+        <Link href="/reports" className="min-h-11 py-2.5 underline">{lang === "bn" ? "দূষণের উৎস রিপোর্ট" : "Report a pollution source"}</Link>
         <span className="py-2.5 text-[var(--muted)]">{lang === "bn" ? "সব পাবলিক টুল উন্মুক্ত" : "Public tools stay open"}</span>
       </nav>
 
